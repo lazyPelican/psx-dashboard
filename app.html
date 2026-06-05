@@ -494,9 +494,15 @@
             </div>
 
             <!-- Scanner cards -->
-            <div class="mb-2 flex items-center justify-between">
+            <div class="mb-2 flex items-center justify-between flex-wrap gap-2">
                 <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">Scanners</h3>
-                <span class="text-xs text-slate-500">Click to add a filter — click again to remove it</span>
+                <div class="flex items-center gap-2">
+                    <span id="bt-status" class="hidden text-xs text-slate-400"></span>
+                    <button id="bt-run" class="text-xs font-semibold px-3 py-1.5 rounded bg-slate-800 text-blue-400 border border-slate-700 hover:border-blue-500 transition" title="Backtest each scanner's historical win rate, expected value, and avg hold across the last 500 trading days of every cached stock">
+                        ⚙ Run Backtest
+                    </button>
+                    <span class="text-xs text-slate-500 hidden sm:inline">Click to add a filter — click again to remove</span>
+                </div>
             </div>
             <div id="scr-scanner-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6"></div>
 
@@ -2956,23 +2962,35 @@
         //   Optional helpers that pick safe defaults are defined just below.
 
         // Buy levels — stop is the closer of [SMA50, price × 0.95]; target = price × (1 + r)
-        function buyLevels(d, targetUpsidePct = 0.08) {
+        // Build long-trade levels with ATR-aware sizing so stops aren't comically tight
+        // when a moving average happens to sit right under price. Defaults:
+        //   stop distance ≥ max(3 × ATR, 4% of entry, 8% of entry max)
+        //   target distance = stop distance × rrTarget (default 2 → R:R 2:1)
+        function buyLevels(d, opts = {}) {
             const entry = d.mw.current;
-            const stopCandidates = [entry * 0.95];
-            if (d.sma50 && d.sma50 < entry) stopCandidates.push(d.sma50);
-            if (d.sma20 && d.sma20 < entry) stopCandidates.push(d.sma20);
-            const stop = Math.max(...stopCandidates); // closest stop below entry
-            const target = entry * (1 + targetUpsidePct);
+            const rrTarget = opts.rrTarget ?? 2.0;
+            // Floor / ceiling stop distance as a fraction of entry
+            const minStopFrac = opts.minStopFrac ?? 0.04;   // never closer than 4%
+            const maxStopFrac = opts.maxStopFrac ?? 0.10;   // never wider than 10%
+            // Preferred stop distance from ATR (3× ATR is a classic swing-trade choice)
+            const atrStop = d.atr14 ? d.atr14 * 3 : entry * minStopFrac;
+            // Clamp the ATR distance to our [minStopFrac, maxStopFrac] band
+            let stopDistance = Math.max(entry * minStopFrac, Math.min(entry * maxStopFrac, atrStop));
+            const stop = entry - stopDistance;
+            // Target distance = stopDistance × R:R (so R:R is exactly the requested ratio)
+            const target = entry + stopDistance * rrTarget;
             return { entry, stop, target };
         }
-        // Sell levels — stop above (invalidation), target below (downside)
-        function sellLevels(d, downsidePct = 0.08) {
+        // Mirror image for short / sell setups
+        function sellLevels(d, opts = {}) {
             const entry = d.mw.current;
-            const stopCandidates = [entry * 1.05];
-            if (d.sma50 && d.sma50 > entry) stopCandidates.push(d.sma50);
-            if (d.sma20 && d.sma20 > entry) stopCandidates.push(d.sma20);
-            const stop = Math.min(...stopCandidates);
-            const target = entry * (1 - downsidePct);
+            const rrTarget = opts.rrTarget ?? 2.0;
+            const minStopFrac = opts.minStopFrac ?? 0.04;
+            const maxStopFrac = opts.maxStopFrac ?? 0.10;
+            const atrStop = d.atr14 ? d.atr14 * 3 : entry * minStopFrac;
+            let stopDistance = Math.max(entry * minStopFrac, Math.min(entry * maxStopFrac, atrStop));
+            const stop = entry + stopDistance;
+            const target = entry - stopDistance * rrTarget;
             return { entry, stop, target };
         }
 
@@ -2985,7 +3003,7 @@
                 metric: (d) => (d.mw.current && d.sma200) ? d.mw.current / d.sma200 : null,
                 match: (d) => d.sma20 != null && d.sma50 != null && d.sma200 != null
                               && d.mw.current > d.sma20 && d.sma20 > d.sma50 && d.sma50 > d.sma200,
-                levels: (d) => buyLevels(d, 0.10)
+                levels: (d) => buyLevels(d, { rrTarget: 2.5 })   // big trend, can aim wider
             },
             {
                 key: 'bullish-pullback', title: 'Bullish Pullback to SMA20', signal: 'buy',
@@ -2996,13 +3014,7 @@
                               && d.mw.current > d.sma200
                               && Math.abs(d.mw.current - d.sma20) / d.sma20 < 0.03
                               && d.mw.current >= d.sma20 * 0.98,
-                levels: (d) => {
-                    const entry = d.mw.current;
-                    const stop = Math.max(entry * 0.95, d.sma50 || 0);
-                    const target = (d.week52High && d.week52High > entry * 1.03 && d.week52High < entry * 1.20)
-                        ? d.week52High : entry * 1.07;
-                    return { entry, stop, target };
-                }
+                levels: (d) => buyLevels(d, { rrTarget: 2.0 })
             },
             {
                 key: 'volume-surge-up', title: 'Volume Surge Up', signal: 'buy',
@@ -3010,12 +3022,7 @@
                 needsEod: true, metricLabel: 'Vol ÷ AvgVol',
                 metric: (d) => (d.mw.volume && d.avgVol20) ? d.mw.volume / d.avgVol20 : null,
                 match: (d) => d.avgVol20 && d.mw.volume >= d.avgVol20 * 2 && d.mw.changePercent > 1,
-                levels: (d) => {
-                    const entry = d.mw.current;
-                    const stop = Math.min(d.mw.low || entry * 0.97, entry * 0.97);
-                    const target = entry * 1.07;
-                    return { entry, stop, target };
-                }
+                levels: (d) => buyLevels(d, { rrTarget: 1.5 })   // shorter-term, smaller target
             },
             {
                 key: 'near-52w-high', title: '52-Week High Breakout', signal: 'buy',
@@ -3023,12 +3030,7 @@
                 needsEod: true, metricLabel: '% Below 52W H',
                 metric: (d) => d.week52High ? (d.week52High - d.mw.current) / d.week52High * 100 : null,
                 match: (d) => d.week52High != null && d.mw.current >= d.week52High * 0.97,
-                levels: (d) => {
-                    const entry = Math.max(d.mw.current, d.week52High * 1.005);
-                    const stop = Math.max(entry * 0.95, d.sma20 || 0);
-                    const target = entry * 1.10;
-                    return { entry, stop, target };
-                }
+                levels: (d) => buyLevels(d, { rrTarget: 2.0 })
             },
             {
                 key: 'macd-bullish', title: 'MACD Positive', signal: 'buy',
@@ -3036,7 +3038,7 @@
                 needsEod: true, metricLabel: 'MACD',
                 metric: (d) => d.macd,
                 match: (d) => d.macd != null && d.macd_prev != null && d.macd > 0 && d.macd_prev <= 0,
-                levels: (d) => buyLevels(d, 0.08)
+                levels: (d) => buyLevels(d, { rrTarget: 2.0 })
             },
             {
                 key: 'golden-cross', title: 'Golden Cross', signal: 'buy',
@@ -3045,7 +3047,7 @@
                 metric: (d) => (d.sma50 != null && d.sma200 != null) ? d.sma50 - d.sma200 : null,
                 match: (d) => d.sma50 != null && d.sma200 != null && d.sma50_prev != null && d.sma200_prev != null
                               && d.sma50 > d.sma200 && d.sma50_prev <= d.sma200_prev,
-                levels: (d) => buyLevels(d, 0.15)
+                levels: (d) => buyLevels(d, { rrTarget: 3.0 })   // long-term trade
             },
             {
                 key: 'rsi-oversold', title: 'RSI Oversold', signal: 'buy',
@@ -3053,12 +3055,7 @@
                 needsEod: true, metricLabel: 'RSI',
                 metric: (d) => d.rsi,
                 match: (d) => d.rsi != null && d.rsi < 30,
-                levels: (d) => {
-                    const entry = d.mw.current;
-                    const stop = Math.max(entry * 0.95, d.week52Low ? d.week52Low * 1.01 : entry * 0.95);
-                    const target = (d.sma20 && d.sma20 > entry) ? d.sma20 : entry * 1.06;
-                    return { entry, stop, target };
-                }
+                levels: (d) => buyLevels(d, { rrTarget: 1.5 })   // mean-revert, smaller target
             },
 
             // ── SELL / AVOID signals (ordered as requested) ──
@@ -3068,12 +3065,7 @@
                 needsEod: true, metricLabel: 'RSI',
                 metric: (d) => d.rsi,
                 match: (d) => d.rsi != null && d.rsi > 70,
-                levels: (d) => {
-                    const entry = d.mw.current;
-                    const stop = entry * 1.05;
-                    const target = (d.sma20 && d.sma20 < entry) ? d.sma20 : entry * 0.93;
-                    return { entry, stop, target };
-                }
+                levels: (d) => sellLevels(d, { rrTarget: 1.5 })
             },
             {
                 key: 'strong-downtrend', title: 'Strong Downtrend', signal: 'sell',
@@ -3082,7 +3074,7 @@
                 metric: (d) => (d.mw.current && d.sma200) ? d.mw.current / d.sma200 : null,
                 match: (d) => d.sma20 != null && d.sma50 != null && d.sma200 != null
                               && d.mw.current < d.sma20 && d.sma20 < d.sma50 && d.sma50 < d.sma200,
-                levels: (d) => sellLevels(d, 0.10)
+                levels: (d) => sellLevels(d, { rrTarget: 2.5 })
             },
             {
                 key: 'volume-surge-down', title: 'Volume Surge Down', signal: 'sell',
@@ -3090,12 +3082,7 @@
                 needsEod: true, metricLabel: 'Vol ÷ AvgVol',
                 metric: (d) => (d.mw.volume && d.avgVol20) ? d.mw.volume / d.avgVol20 : null,
                 match: (d) => d.avgVol20 && d.mw.volume >= d.avgVol20 * 2 && d.mw.changePercent < -1,
-                levels: (d) => {
-                    const entry = d.mw.current;
-                    const stop = Math.max(d.mw.high || entry * 1.03, entry * 1.03);
-                    const target = entry * 0.93;
-                    return { entry, stop, target };
-                }
+                levels: (d) => sellLevels(d, { rrTarget: 1.5 })
             },
             {
                 key: 'macd-bearish', title: 'MACD Negative', signal: 'sell',
@@ -3103,7 +3090,7 @@
                 needsEod: true, metricLabel: 'MACD',
                 metric: (d) => d.macd,
                 match: (d) => d.macd != null && d.macd_prev != null && d.macd < 0 && d.macd_prev >= 0,
-                levels: (d) => sellLevels(d, 0.07)
+                levels: (d) => sellLevels(d, { rrTarget: 2.0 })
             },
             {
                 key: 'near-52w-low', title: '52-Week Low Approach', signal: 'sell',
@@ -3111,12 +3098,7 @@
                 needsEod: true, metricLabel: '% Above 52W L',
                 metric: (d) => d.week52Low ? (d.mw.current - d.week52Low) / d.week52Low * 100 : null,
                 match: (d) => d.week52Low != null && d.mw.current <= d.week52Low * 1.03,
-                levels: (d) => {
-                    const entry = d.mw.current;
-                    const stop = entry * 1.05;
-                    const target = (d.week52Low && d.week52Low < entry) ? d.week52Low * 0.95 : entry * 0.90;
-                    return { entry, stop, target };
-                }
+                levels: (d) => sellLevels(d, { rrTarget: 2.0 })
             },
             {
                 key: 'death-cross', title: 'Death Cross', signal: 'sell',
@@ -3125,7 +3107,7 @@
                 metric: (d) => (d.sma50 != null && d.sma200 != null) ? d.sma200 - d.sma50 : null,
                 match: (d) => d.sma50 != null && d.sma200 != null && d.sma50_prev != null && d.sma200_prev != null
                               && d.sma50 < d.sma200 && d.sma50_prev >= d.sma200_prev,
-                levels: (d) => sellLevels(d, 0.12)
+                levels: (d) => sellLevels(d, { rrTarget: 3.0 })
             }
         ];
 
@@ -3164,7 +3146,8 @@
                 rsi: null, sma20: null, sma50: null, sma200: null, macd: null,
                 sma50_prev: null, sma200_prev: null, macd_prev: null,
                 week52High: null, week52Low: null,
-                avgVol20: null, todayVol: null, prevClose: null
+                avgVol20: null, todayVol: null, prevClose: null,
+                atr14: null
             };
             if (!closes.length) return out;
             out.sma20  = computeSMA(closes, 20);
@@ -3190,6 +3173,14 @@
                 const last20 = volumes.slice(-20);
                 if (last20.length) out.avgVol20 = last20.reduce((a, b) => a + b, 0) / last20.length;
             }
+            // ATR(14) approximation using close-to-close ranges (PSX EOD lacks true high/low)
+            if (closes.length >= 15) {
+                let sum = 0;
+                for (let i = closes.length - 14; i < closes.length; i++) {
+                    sum += Math.abs(closes[i] - closes[i-1]);
+                }
+                out.atr14 = sum / 14;
+            }
             return out;
         }
 
@@ -3208,8 +3199,91 @@
             const closes = sorted.map(d => d.close);
             const volumes = sorted.map(d => d.volume);
             const ind = computeIndicatorsForScreener(closes, volumes);
+            // Stash raw arrays so the backtester can reuse them without re-fetching.
+            // Non-enumerable so they don't get spread into scanner data objects.
+            Object.defineProperty(ind, '_closes',  { value: closes,  enumerable: false });
+            Object.defineProperty(ind, '_volumes', { value: volumes, enumerable: false });
             screenerIndicatorCache[symbol] = ind;
             return ind;
+        }
+
+        // ── Rolling indicator helpers (O(N) per series) used by the backtester.
+        function rollingSMA(closes, period) {
+            const out = new Array(closes.length).fill(null);
+            if (closes.length < period) return out;
+            let sum = 0;
+            for (let i = 0; i < period; i++) sum += closes[i];
+            out[period - 1] = sum / period;
+            for (let i = period; i < closes.length; i++) {
+                sum += closes[i] - closes[i - period];
+                out[i] = sum / period;
+            }
+            return out;
+        }
+        function rollingRSI(closes, period = 14) {
+            const out = new Array(closes.length).fill(null);
+            if (closes.length < period + 1) return out;
+            let gains = 0, losses = 0;
+            for (let i = 1; i <= period; i++) {
+                const diff = closes[i] - closes[i - 1];
+                if (diff >= 0) gains += diff; else losses -= diff;
+            }
+            let avgGain = gains / period;
+            let avgLoss = losses / period;
+            out[period] = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+            for (let i = period + 1; i < closes.length; i++) {
+                const diff = closes[i] - closes[i - 1];
+                avgGain = (avgGain * (period - 1) + Math.max(diff, 0)) / period;
+                avgLoss = (avgLoss * (period - 1) + Math.max(-diff, 0)) / period;
+                out[i] = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+            }
+            return out;
+        }
+        function rollingEMA(closes, period) {
+            const out = new Array(closes.length).fill(null);
+            if (closes.length < period) return out;
+            const k = 2 / (period + 1);
+            let ema = 0;
+            for (let i = 0; i < period; i++) ema += closes[i];
+            ema /= period;
+            out[period - 1] = ema;
+            for (let i = period; i < closes.length; i++) {
+                ema = closes[i] * k + ema * (1 - k);
+                out[i] = ema;
+            }
+            return out;
+        }
+        function rollingMACD(closes) {
+            const e12 = rollingEMA(closes, 12);
+            const e26 = rollingEMA(closes, 26);
+            return closes.map((_, i) => (e12[i] != null && e26[i] != null) ? e12[i] - e26[i] : null);
+        }
+        function rollingATR(closes, period = 14) {
+            const out = new Array(closes.length).fill(null);
+            if (closes.length < period + 1) return out;
+            let sum = 0;
+            for (let i = 1; i <= period; i++) sum += Math.abs(closes[i] - closes[i - 1]);
+            out[period] = sum / period;
+            for (let i = period + 1; i < closes.length; i++) {
+                sum += Math.abs(closes[i] - closes[i - 1]) - Math.abs(closes[i - period] - closes[i - period - 1]);
+                out[i] = sum / period;
+            }
+            return out;
+        }
+        function rollingMaxMin(closes, period) {
+            // Returns parallel arrays: {max, min} over a trailing `period`-day window
+            const max = new Array(closes.length).fill(null);
+            const min = new Array(closes.length).fill(null);
+            for (let i = 0; i < closes.length; i++) {
+                const start = Math.max(0, i - period + 1);
+                let mx = closes[start], mn = closes[start];
+                for (let j = start + 1; j <= i; j++) {
+                    if (closes[j] > mx) mx = closes[j];
+                    if (closes[j] < mn) mn = closes[j];
+                }
+                max[i] = mx; min[i] = mn;
+            }
+            return { max, min };
         }
 
         // ── UI helpers ──
@@ -3235,6 +3309,23 @@
                 const badgeColor = isBuy
                     ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
                     : 'bg-red-500/20 text-red-400 border-red-500/40';
+
+                // Backtest stat strip (only shown if we have data)
+                const bt = backtestStats[s.key];
+                let btHTML = '';
+                if (bt && bt.trades > 0) {
+                    const wrColor = bt.winRate >= 0.55 ? 'text-emerald-400' : bt.winRate >= 0.45 ? 'text-yellow-400' : 'text-red-400';
+                    const evColor = bt.expectedValue > 0 ? 'text-emerald-400' : 'text-red-400';
+                    btHTML = `
+                        <div class="mt-2 pt-2 border-t border-slate-700/50 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-mono">
+                            <span class="text-slate-500">BACKTEST</span>
+                            <span><span class="text-slate-500">Win</span> <span class="${wrColor}">${(bt.winRate * 100).toFixed(0)}%</span></span>
+                            <span><span class="text-slate-500">EV</span> <span class="${evColor}">${bt.expectedValue >= 0 ? '+' : ''}${bt.expectedValue.toFixed(2)}%</span></span>
+                            <span><span class="text-slate-500">n</span> <span class="text-slate-300">${bt.trades}</span></span>
+                            <span><span class="text-slate-500">hold</span> <span class="text-slate-300">${bt.avgHold.toFixed(0)}d</span></span>
+                        </div>`;
+                }
+
                 card.innerHTML = `
                     <div class="flex items-start justify-between mb-2 gap-2">
                         <h4 class="text-base font-bold text-white flex-1">${s.title}</h4>
@@ -3244,6 +3335,7 @@
                         </div>
                     </div>
                     <p class="text-xs text-slate-400 leading-relaxed">${s.description}</p>
+                    ${btHTML}
                 `;
                 card.addEventListener('click', () => {
                     // Always allow clicks on scanners that are already in the chain (so they can be toggled off).
@@ -3403,6 +3495,138 @@
         let screenerResults = [];
 
         let scannerRunning = false;
+
+        // ── Backtest engine ───────────────────────────────────────
+        // Per-scanner historical stats: {trades, wins, losses, winRate, avgWin, avgLoss,
+        //   expectedValue, avgHold, totalReturn}.
+        const backtestStats = {};
+        let backtestInFlight = false;
+
+        // Run all SCANNERS over the last `daysBack` trading days of every cached stock.
+        // Simulates: enter at the signal-day close, exit at target (win), stop (loss),
+        // or after `maxHold` days (timeout — exit at last close).
+        async function runFullBacktest(daysBack = 500, maxHold = 60) {
+            if (backtestInFlight) return;
+            backtestInFlight = true;
+            const status = document.getElementById('bt-status');
+            if (status) { status.classList.remove('hidden'); status.textContent = 'Preparing data…'; }
+
+            // Collect stocks with usable history
+            const symbols = Object.keys(screenerIndicatorCache).filter(s => {
+                const ind = screenerIndicatorCache[s];
+                return ind && ind._closes && ind._closes.length >= 260;
+            });
+
+            // Reset stats
+            SCANNERS.forEach(s => backtestStats[s.key] = { trades: 0, wins: 0, losses: 0, sumReturn: 0, sumWin: 0, sumLoss: 0, sumHold: 0, timeouts: 0 });
+
+            // We use synthetic "mw" objects with `current` set to that day's close.
+            const yieldEvery = 25;
+            for (let si = 0; si < symbols.length; si++) {
+                const sym = symbols[si];
+                const ind = screenerIndicatorCache[sym];
+                const closes = ind._closes;
+                const volumes = ind._volumes;
+                const mwBase = marketWatchData[sym] || { symbol: sym, sectorName: '', name: '' };
+
+                // Precompute rolling indicators for this stock
+                const sma20  = rollingSMA(closes, 20);
+                const sma50  = rollingSMA(closes, 50);
+                const sma200 = rollingSMA(closes, 200);
+                const rsi    = rollingRSI(closes, 14);
+                const macd   = rollingMACD(closes);
+                const atr    = rollingATR(closes, 14);
+                const range52 = rollingMaxMin(closes, 250);
+
+                // Backtest window: last `daysBack` days, but start at index ≥ 250 (warmup for SMA200)
+                const startIdx = Math.max(250, closes.length - daysBack);
+                for (let i = startIdx; i < closes.length - 1; i++) {
+                    const c = closes[i];
+                    const prev = closes[i - 1];
+                    if (!c || !prev) continue;
+                    const d = {
+                        mw: { ...mwBase, current: c, changePercent: ((c - prev) / prev) * 100, volume: volumes[i], high: c, low: c, ldcp: prev },
+                        rsi: rsi[i],
+                        sma20: sma20[i], sma50: sma50[i], sma200: sma200[i],
+                        sma50_prev: sma50[i - 1], sma200_prev: sma200[i - 1],
+                        macd: macd[i], macd_prev: macd[i - 1],
+                        week52High: range52.max[i], week52Low: range52.min[i],
+                        avgVol20: volumes.slice(Math.max(0, i - 19), i + 1).reduce((a, b) => a + (b || 0), 0) / Math.min(20, i + 1),
+                        atr14: atr[i],
+                        prevClose: prev
+                    };
+
+                    SCANNERS.forEach(scanner => {
+                        try {
+                            if (!scanner.match(d)) return;
+                        } catch { return; }
+                        // Get levels
+                        let levels;
+                        try { levels = scanner.levels(d); } catch { return; }
+                        if (!levels) return;
+                        // Walk forward up to maxHold days
+                        const isBuy = scanner.signal === 'buy';
+                        let exitPrice = closes[Math.min(closes.length - 1, i + maxHold)];
+                        let holdDays = Math.min(maxHold, closes.length - 1 - i);
+                        let isTimeout = true;
+                        for (let f = i + 1; f <= Math.min(closes.length - 1, i + maxHold); f++) {
+                            const px = closes[f];
+                            if (isBuy) {
+                                if (px <= levels.stop)   { exitPrice = levels.stop;   holdDays = f - i; isTimeout = false; break; }
+                                if (px >= levels.target) { exitPrice = levels.target; holdDays = f - i; isTimeout = false; break; }
+                            } else {
+                                if (px >= levels.stop)   { exitPrice = levels.stop;   holdDays = f - i; isTimeout = false; break; }
+                                if (px <= levels.target) { exitPrice = levels.target; holdDays = f - i; isTimeout = false; break; }
+                            }
+                        }
+                        const entryPx = c;
+                        const retPct = isBuy
+                            ? (exitPrice - entryPx) / entryPx * 100
+                            : (entryPx - exitPrice) / entryPx * 100;
+                        const s = backtestStats[scanner.key];
+                        s.trades++;
+                        s.sumReturn += retPct;
+                        s.sumHold += holdDays;
+                        if (retPct > 0) { s.wins++; s.sumWin += retPct; }
+                        else if (retPct < 0) { s.losses++; s.sumLoss += retPct; }
+                        if (isTimeout) s.timeouts++;
+                    });
+                }
+
+                if (si % yieldEvery === 0) {
+                    if (status) status.textContent = `Back-testing… ${si + 1} / ${symbols.length} stocks processed`;
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+
+            // Finalize aggregates
+            SCANNERS.forEach(s => {
+                const x = backtestStats[s.key];
+                x.winRate = x.trades > 0 ? x.wins / x.trades : 0;
+                x.avgWin  = x.wins > 0 ? x.sumWin  / x.wins  : 0;
+                x.avgLoss = x.losses > 0 ? x.sumLoss / x.losses : 0;
+                x.expectedValue = x.trades > 0 ? x.sumReturn / x.trades : 0;
+                x.avgHold = x.trades > 0 ? x.sumHold / x.trades : 0;
+                x.totalReturn = x.sumReturn;
+            });
+
+            // Persist (localStorage so it survives a reload)
+            try { localStorage.setItem('psx_backtest_v1', JSON.stringify({ stats: backtestStats, ranAt: Date.now() })); } catch {}
+
+            if (status) status.textContent = `Done. Backtested ${symbols.length} stocks across all scanners.`;
+            backtestInFlight = false;
+            renderScannerCards();   // refresh cards so new stats badges appear
+        }
+
+        function loadCachedBacktest() {
+            try {
+                const raw = localStorage.getItem('psx_backtest_v1');
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                Object.assign(backtestStats, parsed.stats || {});
+                return parsed;
+            } catch { return null; }
+        }
 
         // ── Stock signals panel ─────────────────────────────────────
         // Run all SCANNERS against a single stock and render the matching ones
@@ -4061,7 +4285,21 @@
             screenerInited = true;
             if (!Object.keys(marketWatchData).length) await loadMarketWatch();
             buildScreenerUniverseOptions();
+            loadCachedBacktest();   // populate backtestStats from localStorage if available
             renderScannerCards();
+
+            // Wire Backtest button
+            const btBtn = document.getElementById('bt-run');
+            if (btBtn) btBtn.addEventListener('click', async () => {
+                // Make sure prewarm has loaded raw closes for at least most stocks
+                if (!prewarmDone) {
+                    const status = document.getElementById('bt-status');
+                    status.classList.remove('hidden');
+                    status.textContent = 'Waiting for indicator prewarm to finish first…';
+                    while (!prewarmDone) await new Promise(r => setTimeout(r, 800));
+                }
+                await runFullBacktest();
+            });
 
             // Sort headers
             document.getElementById('scr-results-head').addEventListener('click', (e) => {
