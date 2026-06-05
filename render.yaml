@@ -1,0 +1,18 @@
+# Render.com deployment config. After pushing this repo to GitHub,
+# go to https://dashboard.render.com → New + → Web Service → connect this repo
+# and Render will read this file and deploy automatically.
+
+services:
+  - type: web
+    name: psx-dashboard
+    runtime: node
+    plan: free
+    region: singapore        # closest Render region to Pakistan; change if you prefer
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+    autoDeploy: true
