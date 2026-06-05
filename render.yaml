@@ -7,7 +7,7 @@ services:
     name: psx-dashboard
     runtime: node
     plan: free
-    region: singapore        # closest Render region to Pakistan; change if you prefer
+    region: oregon           # Singapore IPs got blocked by PSX; Oregon usually works
     buildCommand: npm install
     startCommand: node server.js
     envVars:
