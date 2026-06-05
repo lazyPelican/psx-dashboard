@@ -559,6 +559,13 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'app.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`PSX Dashboard running at http://localhost:${PORT}`);
-});
+// Only start the HTTP listener when run directly (i.e. `node server.js`).
+// On serverless platforms (Vercel) the file is imported and the app is wrapped
+// as a function — we just export the app there.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`PSX Dashboard running at http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
