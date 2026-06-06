@@ -275,17 +275,26 @@
                     <div id="chart-indicator-row" class="flex flex-wrap gap-1.5"></div>
                 </div>
 
-                <!-- Sub-chart mode -->
+                <!-- Sub-chart 1 selector -->
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xs text-slate-500 uppercase tracking-wider w-16">Pane 1</span>
+                    <select id="chart-submode1" class="rounded px-2 py-1 border border-slate-700 text-xs"></select>
+                </div>
+
+                <!-- Sub-chart 2 selector -->
                 <div class="flex items-center gap-2 mb-3">
-                    <span class="text-xs text-slate-500 uppercase tracking-wider w-16">Sub-chart</span>
-                    <div id="chart-submode-row" class="flex flex-wrap gap-1.5"></div>
+                    <span class="text-xs text-slate-500 uppercase tracking-wider w-16">Pane 2</span>
+                    <select id="chart-submode2" class="rounded px-2 py-1 border border-slate-700 text-xs"></select>
                 </div>
 
                 <!-- Main candle chart -->
                 <div id="lwc-main" class="w-full rounded-lg border border-slate-700/60 overflow-hidden bg-slate-900/40" style="height:50vh; min-height:340px;"></div>
 
-                <!-- Sub chart (RSI/MACD/Volume) -->
-                <div id="lwc-sub" class="w-full mt-2 rounded-lg border border-slate-700/60 overflow-hidden bg-slate-900/40" style="height:18vh; min-height:120px;"></div>
+                <!-- Sub chart 1 -->
+                <div id="lwc-sub1" class="w-full mt-2 rounded-lg border border-slate-700/60 overflow-hidden bg-slate-900/40" style="height:14vh; min-height:100px;"></div>
+
+                <!-- Sub chart 2 -->
+                <div id="lwc-sub2" class="w-full mt-2 rounded-lg border border-slate-700/60 overflow-hidden bg-slate-900/40" style="height:14vh; min-height:100px;"></div>
             </div>
 
             <!-- Tabs -->
@@ -1929,11 +1938,11 @@
             { key: 'bb',     label: 'Bollinger', color: '#9ba3b4' }
         ];
         const LWC_SUB_MODES = [
-            { key: 'rsi',      label: 'RSI' },
-            { key: 'macd',     label: 'MACD' },
+            { key: 'none',     label: 'Off' },
             { key: 'volume',   label: 'Volume' },
-            { key: 'volumeMA', label: 'Vol+MA' },
-            { key: 'none',     label: 'Off' }
+            { key: 'volumeMA', label: 'Volume + MA20' },
+            { key: 'rsi',      label: 'RSI (14)' },
+            { key: 'macd',     label: 'MACD (12,26,9)' }
         ];
         const LWC_RESOLUTIONS = [
             { key: 'D', label: 'Daily' },
@@ -1944,16 +1953,21 @@
         const lwcState = {
             allBars: [],          // full daily OHLCV (chronological, oldest→newest)
             currentSymbol: null,
-            period: '6m',
+            period: '5y',         // ← changed from 6m
             resolution: 'D',
             activeInds: {},       // {sma20: true, ...}
-            subMode: 'rsi',
+            subMode1: 'volume',   // ← was subMode='rsi'; now 2 separate sub panes
+            subMode2: 'rsi',
             mainChart: null,
-            subChart: null,
+            subChart1: null,
+            subChart2: null,
             candleSeries: null,
+            volumeSeries: null,   // (kept for backward compat; no longer rendered on main)
             overlaySeries: [],
-            subSeriesList: [],
-            syncHandlerInstalled: false
+            subSeries1List: [],
+            subSeries2List: [],
+            syncHandlerInstalled: false,
+            zoomInitedFor: null
         };
 
         // Aggregate daily bars into weekly or monthly OHLCV
@@ -2119,7 +2133,9 @@
                     lwcState.period = p.key;
                     lwcRenderControls();
                     lwcRenderMain();
-                    lwcRenderSub();
+                    lwcRenderAllSub();
+                    // Auto-fit when the user changes range
+                    lwcState.mainChart?.timeScale().fitContent();
                 }));
             });
             const resRow = document.getElementById('chart-resolution-row');
@@ -2129,27 +2145,44 @@
                     lwcState.resolution = r.key;
                     lwcRenderControls();
                     lwcRenderMain();
-                    lwcRenderSub();
+                    lwcRenderAllSub();
+                    lwcState.mainChart?.timeScale().fitContent();
                 }));
             });
             const indRow = document.getElementById('chart-indicator-row');
             indRow.innerHTML = '';
             LWC_INDICATORS.forEach(i => {
-                indRow.appendChild(pill(!!lwcState.activeInds[i.key], i.label, () => {
+                const isActive = !!lwcState.activeInds[i.key];
+                const b = document.createElement('button');
+                b.textContent = i.label;
+                // When active, fill the button with the overlay's color so it's instantly
+                // obvious which colored line on the chart matches which overlay.
+                if (isActive) {
+                    b.style.background = i.color;
+                    b.style.borderColor = i.color;
+                    b.style.color = '#0e0f12';   // dark text on bright color
+                }
+                b.className = 'px-2.5 py-1 text-xs font-semibold rounded transition ' +
+                    (isActive ? '' : 'bg-transparent text-slate-300 border border-slate-700 hover:border-slate-500 hover:text-white');
+                b.onclick = () => {
                     lwcState.activeInds[i.key] = !lwcState.activeInds[i.key];
                     lwcRenderControls();
                     lwcRenderMain();
-                }));
+                };
+                indRow.appendChild(b);
             });
-            const subRow = document.getElementById('chart-submode-row');
-            subRow.innerHTML = '';
-            LWC_SUB_MODES.forEach(m => {
-                subRow.appendChild(pill(lwcState.subMode === m.key, m.label, () => {
-                    lwcState.subMode = m.key;
-                    lwcRenderControls();
-                    lwcRenderSub();
-                }));
-            });
+
+            // Sub-pane selectors — now dropdowns since there are 5 modes × 2 panes
+            const renderSubSelect = (id, currentVal, onChange) => {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                sel.innerHTML = LWC_SUB_MODES
+                    .map(m => `<option value="${m.key}" ${m.key === currentVal ? 'selected' : ''}>${m.label}</option>`)
+                    .join('');
+                sel.onchange = () => onChange(sel.value);
+            };
+            renderSubSelect('chart-submode1', lwcState.subMode1, v => { lwcState.subMode1 = v; lwcRenderSub(1); });
+            renderSubSelect('chart-submode2', lwcState.subMode2, v => { lwcState.subMode2 = v; lwcRenderSub(2); });
         }
 
         // Create or reuse the main candle chart
@@ -2187,17 +2220,9 @@
                 priceLineWidth: 1,
                 priceLineStyle: 2
             });
-            // Volume as a faint histogram pinned to the bottom 22% of the chart
-            const volSeries = chart.addSeries(LightweightCharts.HistogramSeries, {
-                priceFormat: { type: 'volume' },
-                priceScaleId: '',
-                priceLineVisible: false,
-                lastValueVisible: false
-            });
-            volSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
             lwcState.mainChart = chart;
             lwcState.candleSeries = candle;
-            lwcState.volumeSeries = volSeries;
+            lwcState.volumeSeries = null;   // volume now lives in a sub-pane, not on main
 
             // Crosshair legend: live OHLCV readout above the chart
             chart.subscribeCrosshairMove(param => updateChartLegend(param));
@@ -2235,19 +2260,26 @@
             `;
         }
 
-        function lwcEnsureSubChart() {
-            const el = document.getElementById('lwc-sub');
-            if (lwcState.subMode === 'none') {
+        // Create/tear-down sub-pane N. Returns the chart instance for that pane.
+        function lwcEnsureSubChart(paneNum) {
+            const id = paneNum === 1 ? 'lwc-sub1' : 'lwc-sub2';
+            const mode = paneNum === 1 ? lwcState.subMode1 : lwcState.subMode2;
+            const chartKey = paneNum === 1 ? 'subChart1' : 'subChart2';
+            const listKey  = paneNum === 1 ? 'subSeries1List' : 'subSeries2List';
+
+            const el = document.getElementById(id);
+            if (mode === 'none') {
                 el.style.display = 'none';
-                if (lwcState.subChart) {
-                    lwcState.subChart.remove();
-                    lwcState.subChart = null;
-                    lwcState.subSeriesList = [];
+                if (lwcState[chartKey]) {
+                    try { lwcState[chartKey].remove(); } catch {}
+                    lwcState[chartKey] = null;
+                    lwcState[listKey] = [];
+                    installPanZoomSync();   // re-bind sync to remaining panes
                 }
-                return;
+                return null;
             }
             el.style.display = '';
-            if (lwcState.subChart) return;
+            if (lwcState[chartKey]) return lwcState[chartKey];
             el.innerHTML = '';
             const chart = LightweightCharts.createChart(el, {
                 layout: {
@@ -2262,32 +2294,41 @@
                 },
                 crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
                 rightPriceScale: { borderColor: 'transparent' },
-                timeScale: { borderColor: 'transparent', visible: false },
-                autoSize: true
+                timeScale: { borderColor: 'transparent', visible: false, rightOffset: 10 },
+                autoSize: true,
+                handleScroll: { vertTouchDrag: false },
+                handleScale: { axisPressedMouseMove: { time: true, price: true } }
             });
-            lwcState.subChart = chart;
+            lwcState[chartKey] = chart;
+            installPanZoomSync();
+            return chart;
+        }
 
-            // Two-way sync between main & sub — pan/zoom on either propagates to the other.
-            // A boolean guard prevents the infinite ping-pong that naïve cross-subscription causes.
-            if (!lwcState.syncHandlerInstalled && lwcState.mainChart) {
-                let syncing = false;
-                const mainTS = lwcState.mainChart.timeScale();
-                const subTS = lwcState.subChart.timeScale();
-
-                mainTS.subscribeVisibleLogicalRangeChange(r => {
-                    if (syncing || !r || !lwcState.subChart) return;
+        // Cross-link the time scales of every active chart (main + any active sub-panes)
+        // so panning/zooming on any propagates to the rest. A boolean guard breaks the
+        // ping-pong; we always re-install all subscriptions when the set of active
+        // charts changes.
+        function installPanZoomSync() {
+            const charts = [lwcState.mainChart, lwcState.subChart1, lwcState.subChart2].filter(Boolean);
+            if (charts.length < 2) return;
+            // Drop previous subscriptions (LWC v5 doesn't expose unsubscribe by closure
+            // identity easily, so we just guard with a generation counter — older
+            // closures see they're stale and bail).
+            lwcState._syncGen = (lwcState._syncGen || 0) + 1;
+            const gen = lwcState._syncGen;
+            let syncing = false;
+            charts.forEach(src => {
+                src.timeScale().subscribeVisibleLogicalRangeChange(r => {
+                    if (gen !== lwcState._syncGen) return;   // stale subscription, ignore
+                    if (syncing || !r) return;
                     syncing = true;
-                    try { subTS.setVisibleLogicalRange(r); } catch {}
+                    charts.forEach(dst => {
+                        if (dst === src) return;
+                        try { dst.timeScale().setVisibleLogicalRange(r); } catch {}
+                    });
                     syncing = false;
                 });
-                subTS.subscribeVisibleLogicalRangeChange(r => {
-                    if (syncing || !r || !lwcState.mainChart) return;
-                    syncing = true;
-                    try { mainTS.setVisibleLogicalRange(r); } catch {}
-                    syncing = false;
-                });
-                lwcState.syncHandlerInstalled = true;
-            }
+            });
         }
 
         // Render the main candle pane + overlays
@@ -2299,15 +2340,6 @@
             lwcState.candleSeries.setData(bars.map(b => ({
                 time: b.time, open: b.open, high: b.high, low: b.low, close: b.close
             })));
-
-            // Volume histogram (color coded by candle direction)
-            if (lwcState.volumeSeries) {
-                lwcState.volumeSeries.setData(bars.map(b => ({
-                    time: b.time,
-                    value: b.volume || 0,
-                    color: b.close >= b.open ? 'rgba(0,208,132,0.35)' : 'rgba(255,92,92,0.35)'
-                })));
-            }
 
             // Remove old overlay series
             lwcState.overlaySeries.forEach(s => {
@@ -2463,53 +2495,61 @@
             }
         }
 
-        // Render the sub-pane (RSI/MACD/Volume)
-        function lwcRenderSub() {
-            lwcEnsureSubChart();
-            if (lwcState.subMode === 'none' || !lwcState.subChart) return;
+        // Render one sub-pane (paneNum = 1 or 2)
+        function lwcRenderSub(paneNum) {
+            const chart = lwcEnsureSubChart(paneNum);
+            const mode  = paneNum === 1 ? lwcState.subMode1 : lwcState.subMode2;
+            const listKey = paneNum === 1 ? 'subSeries1List' : 'subSeries2List';
+            if (mode === 'none' || !chart) return;
             const bars = lwcCurrentBars();
             if (!bars.length) return;
 
-            lwcState.subSeriesList.forEach(s => { try { lwcState.subChart.removeSeries(s); } catch {} });
-            lwcState.subSeriesList = [];
+            lwcState[listKey].forEach(s => { try { chart.removeSeries(s); } catch {} });
+            lwcState[listKey] = [];
 
             const addLine = (data, color, w = 2) => {
-                const s = lwcState.subChart.addSeries(LightweightCharts.LineSeries, {
+                const s = chart.addSeries(LightweightCharts.LineSeries, {
                     color, lineWidth: w, priceLineVisible: false
                 });
                 s.setData(data);
-                lwcState.subSeriesList.push(s);
+                lwcState[listKey].push(s);
                 return s;
             };
 
-            if (lwcState.subMode === 'rsi') {
+            if (mode === 'rsi') {
                 const line = addLine(calcRSILWC(bars), '#00d084');
                 line.createPriceLine({ price: 70, color: '#ff5c5c', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '70' });
                 line.createPriceLine({ price: 30, color: '#00d084', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '30' });
-            } else if (lwcState.subMode === 'macd') {
+            } else if (mode === 'macd') {
                 const m = calcMACDLWC(bars);
                 addLine(m.macdLine, '#00d084');
                 addLine(m.signalLine, '#ffb340', 1);
-                const h = lwcState.subChart.addSeries(LightweightCharts.HistogramSeries, { priceLineVisible: false });
+                const h = chart.addSeries(LightweightCharts.HistogramSeries, { priceLineVisible: false });
                 h.setData(m.histogram);
-                lwcState.subSeriesList.push(h);
-            } else if (lwcState.subMode === 'volume' || lwcState.subMode === 'volumeMA') {
-                const v = lwcState.subChart.addSeries(LightweightCharts.HistogramSeries, { priceLineVisible: false });
+                lwcState[listKey].push(h);
+            } else if (mode === 'volume' || mode === 'volumeMA') {
+                const v = chart.addSeries(LightweightCharts.HistogramSeries, { priceLineVisible: false });
                 v.setData(bars.map(b => ({
                     time: b.time,
                     value: b.volume ?? 0,
                     color: b.close >= b.open ? 'rgba(0,208,132,0.55)' : 'rgba(255,92,92,0.55)'
                 })));
-                lwcState.subSeriesList.push(v);
-                if (lwcState.subMode === 'volumeMA') addLine(calcVolumeMA(bars, 20), '#facc15');
+                lwcState[listKey].push(v);
+                if (mode === 'volumeMA') addLine(calcVolumeMA(bars, 20), '#facc15');
             }
-            // Align sub chart's visible window with main's so both x-axes match
+            // Align this sub pane to the main's current window
             const mainRange = lwcState.mainChart?.timeScale().getVisibleLogicalRange();
             if (mainRange) {
-                try { lwcState.subChart.timeScale().setVisibleLogicalRange(mainRange); } catch {}
+                try { chart.timeScale().setVisibleLogicalRange(mainRange); } catch {}
             } else {
-                lwcState.subChart.timeScale().fitContent();
+                chart.timeScale().fitContent();
             }
+        }
+
+        // Render BOTH sub panes (used after data load / period change)
+        function lwcRenderAllSub() {
+            lwcRenderSub(1);
+            lwcRenderSub(2);
         }
 
         // Fetch + transform PSX EOD data into Bar[] (oldest→newest, time='YYYY-MM-DD')
@@ -2545,9 +2585,10 @@
         async function loadTradingView(symbol) {
             const mainEl = document.getElementById('lwc-main');
             mainEl.innerHTML = '<div class="flex items-center justify-center h-full text-slate-400">Loading chart data…</div>';
-            // Reset chart instances when switching symbol — easiest way to clear all series
+            // Reset chart instances when switching symbol
             if (lwcState.mainChart) { try { lwcState.mainChart.remove(); } catch {} lwcState.mainChart = null; lwcState.candleSeries = null; lwcState.overlaySeries = []; }
-            if (lwcState.subChart)  { try { lwcState.subChart.remove(); }  catch {} lwcState.subChart  = null; lwcState.subSeriesList = []; }
+            if (lwcState.subChart1) { try { lwcState.subChart1.remove(); } catch {} lwcState.subChart1 = null; lwcState.subSeries1List = []; }
+            if (lwcState.subChart2) { try { lwcState.subChart2.remove(); } catch {} lwcState.subChart2 = null; lwcState.subSeries2List = []; }
             lwcState.syncHandlerInstalled = false;
 
             const bars = await fetchCandleData(symbol);
@@ -2562,7 +2603,9 @@
             lwcRenderControls();
             lwcEnsureMainChart();
             lwcRenderMain();
-            lwcRenderSub();
+            lwcRenderAllSub();
+            // Re-bind pan/zoom sync now that everything's mounted
+            installPanZoomSync();
         }
 
         // Download visible bars (after period + resolution) as CSV
