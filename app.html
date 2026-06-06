@@ -869,6 +869,9 @@
         const PF_STORAGE_KEY = 'psx_portfolio_v1';
         const PF_SETTINGS_KEY = 'psx_settings_v1';
 
+        // Portfolio is persisted server-side (data/portfolio.json on disk) so it
+        // survives browser cache clears, switching browsers, code updates, etc.
+        // localStorage acts as a fast synchronous cache mirror.
         function loadPortfolio() {
             try {
                 const raw = localStorage.getItem(PF_STORAGE_KEY);
@@ -877,6 +880,8 @@
         }
         function savePortfolio(pf) {
             localStorage.setItem(PF_STORAGE_KEY, JSON.stringify(pf));
+            // Fire-and-forget sync to server. Errors are non-fatal — localStorage still wins.
+            syncToServer();
         }
         function loadSettings() {
             try {
@@ -890,6 +895,58 @@
         }
         function saveSettings(s) {
             localStorage.setItem(PF_SETTINGS_KEY, JSON.stringify(s));
+            syncToServer();
+        }
+
+        // Coalesce rapid saves into a single PUT to the server
+        let _syncTimer = null;
+        function syncToServer() {
+            clearTimeout(_syncTimer);
+            _syncTimer = setTimeout(async () => {
+                try {
+                    const body = {
+                        trades: loadPortfolio().trades,
+                        settings: loadSettings()
+                    };
+                    await fetch(API_BASE + '/portfolio', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                } catch (err) {
+                    console.warn('Server sync failed (data still safe in localStorage):', err);
+                }
+            }, 400);
+        }
+
+        // On first init, pull whatever the server has and merge it in.
+        // Strategy: server wins for trades (since it's the persistent store).
+        // If the server is empty but localStorage has data, push it up (migration).
+        async function hydrateFromServer() {
+            try {
+                const res = await fetch(API_BASE + '/portfolio');
+                if (!res.ok) return;
+                const json = await res.json();
+                const serverData = json.data || {};
+                const serverTrades = serverData.trades || [];
+                const localPf = loadPortfolio();
+                const localTrades = localPf.trades || [];
+
+                if (serverTrades.length > 0) {
+                    // Server is authoritative. Replace local cache.
+                    localStorage.setItem(PF_STORAGE_KEY, JSON.stringify({ trades: serverTrades }));
+                    if (serverData.settings) {
+                        localStorage.setItem(PF_SETTINGS_KEY, JSON.stringify(serverData.settings));
+                    }
+                    console.log(`Hydrated ${serverTrades.length} trades from server.`);
+                } else if (localTrades.length > 0) {
+                    // Server is empty but localStorage has data — push it up (one-time migration)
+                    syncToServer();
+                    console.log(`Migrated ${localTrades.length} local trades up to the server.`);
+                }
+            } catch (err) {
+                console.warn('Could not hydrate portfolio from server (using local cache):', err);
+            }
         }
 
         // Broker tiered commission:
@@ -2627,6 +2684,10 @@
         async function init() {
             updateClock();
             setInterval(updateClock, 60000);
+
+            // Pull persisted portfolio + settings from the server into localStorage
+            // BEFORE rendering anything that depends on them.
+            await hydrateFromServer();
 
             await loadMarketWatch();
             await renderDashboard();

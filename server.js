@@ -1,11 +1,45 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const PSX_BASE = 'https://dps.psx.com.pk';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+
+// Persistent storage: portfolio + settings live in data/portfolio.json on disk
+// so they survive browser cache clears, code updates, server restarts, and
+// switching between localhost and a deployed origin.
+// data/ is gitignored so it never gets pushed.
+const DATA_DIR = path.join(__dirname, 'data');
+const PORTFOLIO_FILE = path.join(DATA_DIR, 'portfolio.json');
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+function readPortfolio() {
+  try {
+    if (!fs.existsSync(PORTFOLIO_FILE)) return { trades: [], settings: null };
+    const raw = fs.readFileSync(PORTFOLIO_FILE, 'utf8');
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error('readPortfolio failed:', err.message);
+    return { trades: [], settings: null };
+  }
+}
+function writePortfolio(data) {
+  try {
+    // Write to a temp file first then rename so a crash mid-write doesn't corrupt the file
+    const tmp = PORTFOLIO_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+    fs.renameSync(tmp, PORTFOLIO_FILE);
+    return true;
+  } catch (err) {
+    console.error('writePortfolio failed:', err.message);
+    return false;
+  }
+}
+
+app.use(express.json({ limit: '5mb' }));
 
 // --- In-memory cache ---
 const cache = {};
@@ -552,6 +586,22 @@ app.get('/api/sector-summary', async (req, res) => {
 });
 
 // Static files
+// ── Portfolio persistence ──────────────────────────────────────────
+// GET → returns the saved {trades, settings} object (empty trades if no file yet)
+// PUT → overwrites the file with the supplied {trades, settings}
+app.get('/api/portfolio', (req, res) => {
+  res.json({ status: 1, data: readPortfolio() });
+});
+app.put('/api/portfolio', (req, res) => {
+  const body = req.body || {};
+  if (!Array.isArray(body.trades)) {
+    return res.status(400).json({ status: 0, error: 'Invalid payload: trades must be an array' });
+  }
+  const ok = writePortfolio({ trades: body.trades, settings: body.settings || null });
+  if (!ok) return res.status(500).json({ status: 0, error: 'Failed to write portfolio file' });
+  res.json({ status: 1, data: { trades: body.trades.length } });
+});
+
 app.use(express.static(path.join(__dirname)));
 
 // Fallback to app.html
