@@ -3809,17 +3809,27 @@
         let suggestionsInited = false;
 
         async function initSuggestionsView() {
+            // Always make sure marketWatch + indexList are loaded before building the dropdown
+            if (!Object.keys(marketWatchData).length) await loadMarketWatch();
+            if (!indexList.length) {
+                const data = await fetchAPI('/indices');
+                if (data) {
+                    indicesData = data;
+                    indexList = data.map(idx => {
+                        const friendly = INDEX_FRIENDLY[idx.name] || { name: idx.name, fullName: idx.name };
+                        INDEX_API_MAP[idx.name] = idx.name;
+                        return { id: idx.name, name: friendly.name, fullName: friendly.fullName };
+                    });
+                }
+            }
             if (!suggestionsInited) {
                 suggestionsInited = true;
-                // Build universe options from indexList; default = All Stocks
                 const sel = document.getElementById('sug-universe');
                 sel.innerHTML = '<option value="__all">All Stocks</option>' +
                     indexList.map(i => `<option value="${i.id}">${i.name} — ${i.fullName}</option>`).join('');
                 sel.addEventListener('change', renderSuggestionsView);
                 document.getElementById('sug-refresh').addEventListener('click', renderSuggestionsView);
             }
-            // Kick the screener prewarm if it hasn't already run — Suggestions needs the same data
-            if (!Object.keys(marketWatchData).length) await loadMarketWatch();
             if (!prewarmDone && !prewarmInFlight) prewarmIndicators();
             renderSuggestionsView();
         }
@@ -4388,6 +4398,19 @@
             if (screenerInited) return;
             screenerInited = true;
             if (!Object.keys(marketWatchData).length) await loadMarketWatch();
+            // indexList is populated by renderDashboard; if user came straight to Screener
+            // without visiting Markets, populate it now from the indices endpoint.
+            if (!indexList.length) {
+                const data = await fetchAPI('/indices');
+                if (data) {
+                    indicesData = data;
+                    indexList = data.map(idx => {
+                        const friendly = INDEX_FRIENDLY[idx.name] || { name: idx.name, fullName: idx.name };
+                        INDEX_API_MAP[idx.name] = idx.name;
+                        return { id: idx.name, name: friendly.name, fullName: friendly.fullName };
+                    });
+                }
+            }
             buildScreenerUniverseOptions();
             loadCachedBacktest();   // populate backtestStats from localStorage if available
             renderScannerCards();
