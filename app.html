@@ -4195,10 +4195,56 @@
                 }
             }
 
+            // ── Dedupe per (day, symbol) ──
+            // If multiple scanners fire on the same stock on the same day,
+            // collapse to a single row. Keep the highest-R:R scanner's
+            // entry/stop/target/outcome but record all firing scanner names.
+            const consolidated = new Map();
+            for (const r of log) {
+                const key = `${r.signalDayIndex}|${r.symbol}|${r.side}`;
+                const rr = computeRR({ entry: r.entry, stop: r.stop, target: r.target }, r.side) ?? 0;
+                let g = consolidated.get(key);
+                if (!g) {
+                    g = {
+                        ...r,
+                        scannerTitles: [r.scannerTitle],
+                        scannerKeys: [r.scanner],
+                        bestRR: rr,
+                        bestScannerTitle: r.scannerTitle
+                    };
+                    consolidated.set(key, g);
+                } else {
+                    g.scannerTitles.push(r.scannerTitle);
+                    g.scannerKeys.push(r.scanner);
+                    if (rr > g.bestRR) {
+                        // Better R:R → adopt this scanner's levels & forward outcome
+                        g.bestRR = rr;
+                        g.entry = r.entry; g.stop = r.stop; g.target = r.target;
+                        g.scanner = r.scanner; g.scannerTitle = r.scannerTitle;
+                        g.bestScannerTitle = r.scannerTitle;
+                        g.outcome = r.outcome; g.exitPrice = r.exitPrice;
+                        g.exitDay = r.exitDay; g.daysToOutcome = r.daysToOutcome;
+                        g.returnPct = r.returnPct;
+                    }
+                }
+            }
+            // Now group by day and cap at 5 per day (ranked by signal_count × 10 + best_RR)
+            const byDay = new Map();
+            for (const g of consolidated.values()) {
+                let arr = byDay.get(g.signalDayIndex);
+                if (!arr) { arr = []; byDay.set(g.signalDayIndex, arr); }
+                arr.push(g);
+            }
+            const finalLog = [];
+            for (const arr of byDay.values()) {
+                arr.sort((a, b) => (b.scannerTitles.length * 10 + b.bestRR) - (a.scannerTitles.length * 10 + a.bestRR));
+                arr.slice(0, 5).forEach(r => finalLog.push(r));
+            }
+
             // Sort by signal date descending (most recent first)
-            log.sort((a, b) => b.signalDayIndex - a.signalDayIndex || a.symbol.localeCompare(b.symbol));
-            signalLogData = log;
-            status.textContent = `Found ${log.length} signals.`;
+            finalLog.sort((a, b) => b.signalDayIndex - a.signalDayIndex || a.symbol.localeCompare(b.symbol));
+            signalLogData = finalLog;
+            status.textContent = `Showing ${finalLog.length} top suggestions (max 5 per day, deduped).`;
             runBtn.disabled = false;
             renderSignalLog();
         }
@@ -4211,7 +4257,11 @@
             const filtered = signalLogData.filter(r => {
                 if (sideFilter !== 'all' && r.side !== sideFilter) return false;
                 if (outcomeFilter !== 'all' && r.outcome !== outcomeFilter) return false;
-                if (scannerFilter !== 'all' && r.scanner !== scannerFilter) return false;
+                if (scannerFilter !== 'all') {
+                    // Match against any of the firing scanners in this consolidated row
+                    const keys = r.scannerKeys || [r.scanner];
+                    if (!keys.includes(scannerFilter)) return false;
+                }
                 return true;
             });
 
@@ -4265,10 +4315,21 @@
                     const idx = (mw?.listedIn || '').split(/\s+/).find(t => INDEX_FRIENDLY[t]) || 'KSE100';
                     openStock(r.symbol, idx);
                 };
+                // Build the scanner cell — show all firing scanners (the best one drives the levels)
+                const titles = r.scannerTitles || [r.scannerTitle];
+                let scannerCellHTML;
+                if (titles.length === 1) {
+                    scannerCellHTML = `<span class="text-xs text-slate-300">${titles[0]}</span>`;
+                } else {
+                    // Best one highlighted, extras shown after a "+N" tag
+                    const extras = titles.filter(t => t !== r.bestScannerTitle);
+                    scannerCellHTML = `<span class="text-xs text-slate-200 font-semibold">${r.bestScannerTitle}</span>` +
+                        ` <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/40" title="${extras.join(', ')}">+${extras.length}</span>`;
+                }
                 tr.innerHTML = `
                     <td class="py-2 text-slate-400 text-xs">${r.signalDate}</td>
                     <td class="py-2 font-bold text-blue-400">${r.symbol}</td>
-                    <td class="py-2 text-slate-300 hidden md:table-cell text-xs">${r.scannerTitle}</td>
+                    <td class="py-2 hidden md:table-cell">${scannerCellHTML}</td>
                     <td class="py-2">${sideChip}</td>
                     <td class="py-2 text-right font-mono">${r.entry.toFixed(2)}</td>
                     <td class="py-2 text-right font-mono text-red-300">${r.stop.toFixed(2)}</td>
@@ -4296,14 +4357,17 @@
                 if (scannerFilter !== 'all' && r.scanner !== scannerFilter) return false;
                 return true;
             });
-            const header = ['Signal Date','Symbol','Company','Scanner','Side','Entry','Stop','Target','Outcome','Days to Outcome','Exit Price','Return %'];
-            const lines = rows.map(r => [
-                r.signalDate, r.symbol, '"' + (r.symbolName || '').replace(/"/g, '""') + '"',
-                '"' + r.scannerTitle + '"', r.side,
-                r.entry.toFixed(2), r.stop.toFixed(2), r.target.toFixed(2),
-                r.outcome, r.daysToOutcome ?? '', r.exitPrice ? r.exitPrice.toFixed(2) : '',
-                r.returnPct.toFixed(2)
-            ].join(','));
+            const header = ['Signal Date','Symbol','Company','Scanners','Side','Entry','Stop','Target','Outcome','Days to Outcome','Exit Price','Return %'];
+            const lines = rows.map(r => {
+                const allScanners = (r.scannerTitles || [r.scannerTitle]).join(' | ');
+                return [
+                    r.signalDate, r.symbol, '"' + (r.symbolName || '').replace(/"/g, '""') + '"',
+                    '"' + allScanners.replace(/"/g, '""') + '"', r.side,
+                    r.entry.toFixed(2), r.stop.toFixed(2), r.target.toFixed(2),
+                    r.outcome, r.daysToOutcome ?? '', r.exitPrice ? r.exitPrice.toFixed(2) : '',
+                    r.returnPct.toFixed(2)
+                ].join(',');
+            });
             const csv = [header.join(','), ...lines].join('\n');
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
             const url = URL.createObjectURL(blob);
