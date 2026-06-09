@@ -62,6 +62,10 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8V4H8m0 0V4m0 0h4M4 8h16M4 12h16M4 16h16M4 20h16"></path></svg>
                     AI Trading
                 </button>
+                <button data-nav="signal_log" class="nav-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                    Signal Log
+                </button>
                 <button data-nav="portfolio" class="nav-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.93 23.93 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                     Portfolio
@@ -558,6 +562,103 @@
                 </div>
                 <div id="scr-results-empty" class="hidden text-center text-slate-400 py-8">No stocks matched this scanner.</div>
                 <div id="scr-results-search-empty" class="hidden text-center text-slate-400 py-8">No stocks in results match your search.</div>
+            </div>
+        </div>
+
+        <!-- SIGNAL LOG VIEW -->
+        <div id="signal_log-view" class="view view-hidden">
+            <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h1 class="text-4xl font-bold text-white tracking-tight mb-1">Signal Log</h1>
+                    <p class="text-slate-400 text-sm">Every scanner suggestion that fired on a historical day, with its actual outcome.</p>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="glass-card rounded-xl p-4 mb-4">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Universe</label>
+                        <select id="sl-universe" class="w-full rounded px-3 py-2 border border-slate-700 text-sm"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Lookback</label>
+                        <select id="sl-lookback" class="w-full rounded px-3 py-2 border border-slate-700 text-sm">
+                            <option value="30">30 days</option>
+                            <option value="60" selected>60 days</option>
+                            <option value="90">90 days</option>
+                            <option value="180">6 months</option>
+                            <option value="365">1 year</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Side</label>
+                        <select id="sl-side" class="w-full rounded px-3 py-2 border border-slate-700 text-sm">
+                            <option value="all" selected>Buy & Sell</option>
+                            <option value="buy">Buy only</option>
+                            <option value="sell">Sell only</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Outcome</label>
+                        <select id="sl-outcome" class="w-full rounded px-3 py-2 border border-slate-700 text-sm">
+                            <option value="all" selected>All</option>
+                            <option value="target">✓ Target hit</option>
+                            <option value="stop">✗ Stop hit</option>
+                            <option value="open">⏳ Open</option>
+                            <option value="timeout">⌛ Timed out</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Scanner</label>
+                        <select id="sl-scanner" class="w-full rounded px-3 py-2 border border-slate-700 text-sm">
+                            <option value="all" selected>All scanners</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <button id="sl-run" class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        Generate Log
+                    </button>
+                    <button id="sl-export" class="hidden px-3 py-2 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 border border-slate-700 hover:border-blue-500 hover:text-white transition" title="Download as CSV">
+                        ⤓ Export CSV
+                    </button>
+                    <div id="sl-status" class="text-xs text-slate-400 ml-auto"></div>
+                </div>
+            </div>
+
+            <!-- Summary cards -->
+            <div id="sl-summary" class="hidden grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+                <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">Total signals</div><div id="sl-total" class="text-lg font-bold text-white">--</div></div>
+                <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">Target hit</div><div id="sl-stat-target" class="text-lg font-bold text-emerald-400">--</div></div>
+                <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">Stop hit</div><div id="sl-stat-stop" class="text-lg font-bold text-red-400">--</div></div>
+                <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">Still open</div><div id="sl-stat-open" class="text-lg font-bold text-yellow-400">--</div></div>
+                <div class="glass-card rounded-lg p-3 border border-blue-500/30"><div class="text-xs text-blue-300 uppercase">Win rate (closed)</div><div id="sl-stat-winrate" class="text-lg font-bold">--</div></div>
+            </div>
+
+            <!-- Log table -->
+            <div id="sl-log-container" class="hidden glass-card rounded-xl p-4">
+                <div class="overflow-x-auto max-h-[70vh] overflow-y-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-slate-400 text-xs uppercase border-b border-slate-700 sticky top-0 bg-slate-900">
+                            <tr>
+                                <th class="py-2">Signal Date</th>
+                                <th class="py-2">Symbol</th>
+                                <th class="py-2 hidden md:table-cell">Scanner</th>
+                                <th class="py-2">Side</th>
+                                <th class="py-2 text-right">Entry</th>
+                                <th class="py-2 text-right">Stop</th>
+                                <th class="py-2 text-right">Target</th>
+                                <th class="py-2">Outcome</th>
+                                <th class="py-2 text-right hidden sm:table-cell">Days</th>
+                                <th class="py-2 text-right">Return</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sl-log-body" class="divide-y divide-slate-800"></tbody>
+                    </table>
+                </div>
+                <div id="sl-log-empty" class="hidden text-center text-slate-400 py-8">No signals match your filters.</div>
             </div>
         </div>
 
@@ -3922,6 +4023,294 @@
             });
         }
 
+        // ───── Signal Log ───────────────────────────────────────────
+        // Lists every historical signal in the chosen window with its outcome
+        // (target hit / stop hit / still open / timed out after N days).
+        let signalLogInited = false;
+        let signalLogData = [];
+
+        async function initSignalLogView() {
+            if (!Object.keys(marketWatchData).length) await loadMarketWatch();
+            if (!indexList.length) {
+                const data = await fetchAPI('/indices');
+                if (data) {
+                    indicesData = data;
+                    indexList = data.map(idx => {
+                        const friendly = INDEX_FRIENDLY[idx.name] || { name: idx.name, fullName: idx.name };
+                        INDEX_API_MAP[idx.name] = idx.name;
+                        return { id: idx.name, name: friendly.name, fullName: friendly.fullName };
+                    });
+                }
+            }
+            if (!signalLogInited) {
+                signalLogInited = true;
+                const uSel = document.getElementById('sl-universe');
+                uSel.innerHTML = indexList.map(i => `<option value="${i.id}">${i.name}</option>`).join('') +
+                    '<option value="__all">All Stocks</option>';
+                uSel.value = 'KSE100';
+                const scnSel = document.getElementById('sl-scanner');
+                scnSel.innerHTML = '<option value="all" selected>All scanners</option>' +
+                    SCANNERS.map(s => `<option value="${s.key}">${s.title}</option>`).join('');
+
+                document.getElementById('sl-run').addEventListener('click', runSignalLog);
+                document.getElementById('sl-export').addEventListener('click', exportSignalLogCSV);
+                // Re-filter live when filter dropdowns change
+                ['sl-side', 'sl-outcome', 'sl-scanner'].forEach(id => {
+                    document.getElementById(id).addEventListener('change', renderSignalLog);
+                });
+            }
+            if (!prewarmDone && !prewarmInFlight) prewarmIndicators();
+        }
+
+        async function runSignalLog() {
+            const status = document.getElementById('sl-status');
+            const runBtn = document.getElementById('sl-run');
+            runBtn.disabled = true;
+
+            if (!prewarmDone) {
+                while (!prewarmDone) {
+                    status.textContent = `Indicators loading: ${Object.keys(screenerIndicatorCache).length} / ${Object.keys(marketWatchData).length}`;
+                    await new Promise(r => setTimeout(r, 800));
+                }
+            }
+
+            const universe = document.getElementById('sl-universe').value;
+            const lookback = parseInt(document.getElementById('sl-lookback').value) || 60;
+            const maxHold = 60;  // days to wait before declaring 'timed out'
+
+            let candidates;
+            if (universe === '__all') candidates = Object.values(marketWatchData);
+            else {
+                const data = await fetchAPI('/index/' + universe);
+                candidates = data || [];
+            }
+            candidates = candidates.filter(c => {
+                const ind = screenerIndicatorCache[c.symbol];
+                return ind && ind._closes && ind._closes.length >= 260;
+            });
+
+            status.textContent = `Scanning ${candidates.length} stocks…`;
+            await new Promise(r => setTimeout(r, 50));
+
+            const log = [];
+            // Today's date (approx — uses the most recent EOD bar across stocks as "today")
+            const todayUnix = Math.floor(Date.now() / 1000);
+
+            for (let ci = 0; ci < candidates.length; ci++) {
+                const c = candidates[ci];
+                const ind = screenerIndicatorCache[c.symbol];
+                const closes = ind._closes;
+                const volumes = ind._volumes;
+                const len = closes.length;
+
+                // Reconstruct dates: most recent bar = today, going backwards by trading days
+                // (1 trading day ≈ 1 calendar day for display purposes)
+                const dateOf = (idx) => {
+                    const ts = todayUnix - (len - 1 - idx) * 86400;
+                    return new Date(ts * 1000).toISOString().split('T')[0];
+                };
+
+                // Precompute rolling indicators
+                const sma20 = rollingSMA(closes, 20);
+                const sma50 = rollingSMA(closes, 50);
+                const sma200 = rollingSMA(closes, 200);
+                const rsi = rollingRSI(closes, 14);
+                const macd = rollingMACD(closes);
+                const atr = rollingATR(closes, 14);
+                const r52 = rollingMaxMin(closes, 250);
+
+                // Loop over the last `lookback` trading days
+                const start = Math.max(250, len - lookback);
+                for (let i = start; i < len; i++) {
+                    if (!closes[i] || !closes[i-1]) continue;
+                    const d = {
+                        mw: { ...c, current: closes[i],
+                            changePercent: ((closes[i] - closes[i-1]) / closes[i-1]) * 100,
+                            volume: volumes[i], high: closes[i], low: closes[i], ldcp: closes[i-1] },
+                        rsi: rsi[i],
+                        sma20: sma20[i], sma50: sma50[i], sma200: sma200[i],
+                        sma50_prev: sma50[i-1], sma200_prev: sma200[i-1],
+                        macd: macd[i], macd_prev: macd[i-1],
+                        week52High: r52.max[i], week52Low: r52.min[i],
+                        avgVol20: (() => { let s = 0, n = 0; for (let j = Math.max(0, i-19); j <= i; j++) { s += volumes[j] || 0; n++; } return n > 0 ? s / n : 0; })(),
+                        atr14: atr[i],
+                        prevClose: closes[i-1]
+                    };
+                    SCANNERS.forEach(scanner => {
+                        try { if (!scanner.match(d)) return; } catch { return; }
+                        let levels;
+                        try { levels = scanner.levels(d); } catch { return; }
+                        if (!levels) return;
+                        const entry = closes[i];
+                        // Look forward to determine outcome
+                        const isBuy = scanner.signal === 'buy';
+                        let outcome = 'open';
+                        let exitPrice = null, exitDay = null;
+                        const horizon = Math.min(len - 1, i + maxHold);
+                        for (let f = i + 1; f <= horizon; f++) {
+                            const px = closes[f];
+                            if (isBuy) {
+                                if (px <= levels.stop)   { outcome = 'stop';   exitPrice = levels.stop;   exitDay = f; break; }
+                                if (px >= levels.target) { outcome = 'target'; exitPrice = levels.target; exitDay = f; break; }
+                            } else {
+                                if (px >= levels.stop)   { outcome = 'stop';   exitPrice = levels.stop;   exitDay = f; break; }
+                                if (px <= levels.target) { outcome = 'target'; exitPrice = levels.target; exitDay = f; break; }
+                            }
+                        }
+                        if (outcome === 'open') {
+                            // Did we run out of room within maxHold?
+                            if (horizon - i >= maxHold - 1 && horizon < len - 1) {
+                                outcome = 'timeout';
+                                exitPrice = closes[horizon];
+                                exitDay = horizon;
+                            }
+                            // Else: still open (no exit yet within available data)
+                        }
+                        const returnPct = exitPrice != null
+                            ? (isBuy ? (exitPrice - entry) / entry * 100 : (entry - exitPrice) / entry * 100)
+                            : (isBuy ? (closes[len-1] - entry) / entry * 100 : (entry - closes[len-1]) / entry * 100);
+                        log.push({
+                            signalDate: dateOf(i),
+                            signalDayIndex: i,
+                            symbol: c.symbol,
+                            symbolName: c.name || '',
+                            scanner: scanner.key,
+                            scannerTitle: scanner.title,
+                            side: scanner.signal,
+                            entry, stop: levels.stop, target: levels.target,
+                            outcome, exitPrice, exitDay,
+                            daysToOutcome: exitDay != null ? exitDay - i : null,
+                            returnPct,
+                            currentPrice: closes[len-1]
+                        });
+                    });
+                }
+
+                if (ci % 25 === 0) {
+                    status.textContent = `Scanning… ${ci+1} / ${candidates.length}`;
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+
+            // Sort by signal date descending (most recent first)
+            log.sort((a, b) => b.signalDayIndex - a.signalDayIndex || a.symbol.localeCompare(b.symbol));
+            signalLogData = log;
+            status.textContent = `Found ${log.length} signals.`;
+            runBtn.disabled = false;
+            renderSignalLog();
+        }
+
+        function renderSignalLog() {
+            const sideFilter = document.getElementById('sl-side').value;
+            const outcomeFilter = document.getElementById('sl-outcome').value;
+            const scannerFilter = document.getElementById('sl-scanner').value;
+
+            const filtered = signalLogData.filter(r => {
+                if (sideFilter !== 'all' && r.side !== sideFilter) return false;
+                if (outcomeFilter !== 'all' && r.outcome !== outcomeFilter) return false;
+                if (scannerFilter !== 'all' && r.scanner !== scannerFilter) return false;
+                return true;
+            });
+
+            document.getElementById('sl-summary').classList.remove('hidden');
+            document.getElementById('sl-log-container').classList.remove('hidden');
+            document.getElementById('sl-export').classList.remove('hidden');
+
+            // Summary stats
+            const total = filtered.length;
+            const tgt = filtered.filter(r => r.outcome === 'target').length;
+            const stp = filtered.filter(r => r.outcome === 'stop').length;
+            const opn = filtered.filter(r => r.outcome === 'open').length;
+            const closedCount = tgt + stp;
+            const winRate = closedCount > 0 ? (tgt / closedCount) * 100 : 0;
+            document.getElementById('sl-total').textContent = total;
+            document.getElementById('sl-stat-target').textContent = tgt;
+            document.getElementById('sl-stat-stop').textContent = stp;
+            document.getElementById('sl-stat-open').textContent = opn;
+            const wr = document.getElementById('sl-stat-winrate');
+            wr.textContent = closedCount > 0 ? `${winRate.toFixed(1)}% (${tgt}/${closedCount})` : '—';
+            wr.className = 'text-lg font-bold ' + (winRate >= 50 ? 'text-emerald-400' : 'text-red-400');
+
+            const body = document.getElementById('sl-log-body');
+            const empty = document.getElementById('sl-log-empty');
+            body.innerHTML = '';
+            if (filtered.length === 0) {
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+
+            // Render up to 500 rows for performance; show count if truncated
+            const slice = filtered.slice(0, 500);
+            slice.forEach(r => {
+                const isBuy = r.side === 'buy';
+                let outcomeChip = '';
+                if (r.outcome === 'target') outcomeChip = '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">✓ Target</span>';
+                else if (r.outcome === 'stop') outcomeChip = '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/40">✗ Stop</span>';
+                else if (r.outcome === 'open') outcomeChip = '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-yellow-500/20 text-yellow-400 border border-yellow-500/40">⏳ Open</span>';
+                else if (r.outcome === 'timeout') outcomeChip = '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-500/20 text-slate-300 border border-slate-500/40">⌛ Timeout</span>';
+
+                const sideChip = isBuy
+                    ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400">BUY</span>'
+                    : '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400">SELL</span>';
+
+                const retColor = r.returnPct > 0 ? 'text-emerald-400' : r.returnPct < 0 ? 'text-red-400' : 'text-slate-400';
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-800/30 cursor-pointer';
+                tr.onclick = () => {
+                    const mw = marketWatchData[r.symbol];
+                    const idx = (mw?.listedIn || '').split(/\s+/).find(t => INDEX_FRIENDLY[t]) || 'KSE100';
+                    openStock(r.symbol, idx);
+                };
+                tr.innerHTML = `
+                    <td class="py-2 text-slate-400 text-xs">${r.signalDate}</td>
+                    <td class="py-2 font-bold text-blue-400">${r.symbol}</td>
+                    <td class="py-2 text-slate-300 hidden md:table-cell text-xs">${r.scannerTitle}</td>
+                    <td class="py-2">${sideChip}</td>
+                    <td class="py-2 text-right font-mono">${r.entry.toFixed(2)}</td>
+                    <td class="py-2 text-right font-mono text-red-300">${r.stop.toFixed(2)}</td>
+                    <td class="py-2 text-right font-mono text-emerald-300">${r.target.toFixed(2)}</td>
+                    <td class="py-2">${outcomeChip}</td>
+                    <td class="py-2 text-right text-slate-400 hidden sm:table-cell">${r.daysToOutcome != null ? r.daysToOutcome + 'd' : '—'}</td>
+                    <td class="py-2 text-right font-mono ${retColor}">${r.returnPct >= 0 ? '+' : ''}${r.returnPct.toFixed(2)}%</td>
+                `;
+                body.appendChild(tr);
+            });
+            if (filtered.length > 500) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="10" class="py-3 text-center text-slate-500 text-xs">… ${filtered.length - 500} more signals not shown. Use filters to narrow or Export CSV for the full list.</td>`;
+                body.appendChild(tr);
+            }
+        }
+
+        function exportSignalLogCSV() {
+            const sideFilter = document.getElementById('sl-side').value;
+            const outcomeFilter = document.getElementById('sl-outcome').value;
+            const scannerFilter = document.getElementById('sl-scanner').value;
+            const rows = signalLogData.filter(r => {
+                if (sideFilter !== 'all' && r.side !== sideFilter) return false;
+                if (outcomeFilter !== 'all' && r.outcome !== outcomeFilter) return false;
+                if (scannerFilter !== 'all' && r.scanner !== scannerFilter) return false;
+                return true;
+            });
+            const header = ['Signal Date','Symbol','Company','Scanner','Side','Entry','Stop','Target','Outcome','Days to Outcome','Exit Price','Return %'];
+            const lines = rows.map(r => [
+                r.signalDate, r.symbol, '"' + (r.symbolName || '').replace(/"/g, '""') + '"',
+                '"' + r.scannerTitle + '"', r.side,
+                r.entry.toFixed(2), r.stop.toFixed(2), r.target.toFixed(2),
+                r.outcome, r.daysToOutcome ?? '', r.exitPrice ? r.exitPrice.toFixed(2) : '',
+                r.returnPct.toFixed(2)
+            ].join(','));
+            const csv = [header.join(','), ...lines].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `psx_signal_log_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
         // ───── AI Trading simulator ─────────────────────────────────
         let aiTradingInited = false;
         let aiEquityChart = null;
@@ -5027,7 +5416,7 @@
         // ───── Top-nav wiring ────────────────────────────────────
         function showView(viewName) {
             currentView = viewName;
-            ['dashboard', 'index', 'stock', 'portfolio', 'screener', 'suggestions', 'ai_trading'].forEach(v => {
+            ['dashboard', 'index', 'stock', 'portfolio', 'screener', 'suggestions', 'ai_trading', 'signal_log'].forEach(v => {
                 const el = document.getElementById(`${v}-view`);
                 if (!el) return;
                 el.className = (v === viewName) ? 'view view-active' : 'view view-hidden';
@@ -5064,6 +5453,9 @@
                 } else if (target === 'ai_trading') {
                     showView('ai_trading');
                     initAITradingView();
+                } else if (target === 'signal_log') {
+                    showView('signal_log');
+                    initSignalLogView();
                 } else {
                     showView('dashboard');
                     currentIndex = null; currentStock = null;
