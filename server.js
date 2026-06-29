@@ -12,9 +12,15 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 // so they survive browser cache clears, code updates, server restarts, and
 // switching between localhost and a deployed origin.
 // data/ is gitignored so it never gets pushed.
-const DATA_DIR = path.join(__dirname, 'data');
+// On serverless platforms (Vercel) the project dir is read-only and only /tmp
+// is writable (but ephemeral per-invocation). Locally we use ./data so the
+// portfolio survives restarts. On Vercel the frontend localStorage is the
+// real source of truth — the server endpoints just won't persist.
+const IS_SERVERLESS = !!process.env.VERCEL;
+const DATA_DIR = IS_SERVERLESS ? '/tmp/psx-data' : path.join(__dirname, 'data');
 const PORTFOLIO_FILE = path.join(DATA_DIR, 'portfolio.json');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+try { if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true }); }
+catch (err) { console.error('Could not create data dir:', err.message); }
 
 function readPortfolio() {
   try {
