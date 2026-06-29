@@ -61,14 +61,6 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
                     Suggestions
                 </button>
-                <button data-nav="ai_trading" class="nav-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8V4H8m0 0V4m0 0h4M4 8h16M4 12h16M4 16h16M4 20h16"></path></svg>
-                    AI Trading
-                </button>
-                <button data-nav="signal_log" class="nav-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-                    Signal Log
-                </button>
                 <button data-nav="portfolio" class="nav-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.93 23.93 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                     Portfolio
@@ -314,6 +306,7 @@
                 <button class="tab-btn px-4 py-3 text-sm font-medium whitespace-nowrap" data-tab="technicals">Technicals</button>
                 <button class="tab-btn px-4 py-3 text-sm font-medium whitespace-nowrap" data-tab="fundamentals">Fundamentals</button>
                 <button class="tab-btn px-4 py-3 text-sm font-medium whitespace-nowrap" data-tab="dividends">Dividends</button>
+                <button class="tab-btn px-4 py-3 text-sm font-medium whitespace-nowrap" data-tab="seasonality">Seasonality</button>
             </div>
 
             <!-- Tab Contents -->
@@ -472,6 +465,33 @@
                     </div>
                 </div>
             </div>
+
+            <div id="tab-content-seasonality" class="tab-content view-hidden space-y-6">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                            <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            Seasonality Analysis
+                        </h3>
+                        <div id="seasonality-meta" class="text-xs text-slate-400">--</div>
+                    </div>
+                    <div id="seasonality-status" class="text-center text-slate-400 py-8 text-sm">Loading seasonal data…</div>
+                    <div id="seasonality-charts" class="hidden space-y-5">
+                        <div>
+                            <div class="text-sm font-semibold text-white mb-1 text-center" id="seas-title-1">Seasonal Composite (detrended, each year = 100)</div>
+                            <div id="seas-chart-composite" class="w-full"></div>
+                        </div>
+                        <div>
+                            <div class="text-sm font-semibold text-white mb-1 text-center">Average return by calendar month (%)</div>
+                            <div id="seas-chart-monthly" class="w-full"></div>
+                        </div>
+                        <div>
+                            <div class="text-sm font-semibold text-white mb-1 text-center">Avg 6-month FORWARD return by entry month (%) — buy 1st of month, hold 6m</div>
+                            <div id="seas-chart-forward" class="w-full"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- PORTFOLIO VIEW -->
@@ -565,216 +585,6 @@
                 </div>
                 <div id="scr-results-empty" class="hidden text-center text-slate-400 py-8">No stocks matched this scanner.</div>
                 <div id="scr-results-search-empty" class="hidden text-center text-slate-400 py-8">No stocks in results match your search.</div>
-            </div>
-        </div>
-
-        <!-- SIGNAL LOG VIEW -->
-        <div id="signal_log-view" class="view view-hidden">
-            <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
-                <div>
-                    <h1 class="text-4xl font-bold text-white tracking-tight mb-1">Signal Log</h1>
-                    <p class="text-slate-400 text-sm">Every scanner suggestion that fired on a historical day, with its actual outcome.</p>
-                </div>
-            </div>
-
-            <!-- Controls -->
-            <div class="glass-card rounded-xl p-4 mb-4">
-                <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
-                    <div>
-                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Universe</label>
-                        <select id="sl-universe" class="w-full rounded px-3 py-2 border border-slate-700 text-sm"></select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Lookback</label>
-                        <select id="sl-lookback" class="w-full rounded px-3 py-2 border border-slate-700 text-sm">
-                            <option value="30">30 days</option>
-                            <option value="60" selected>60 days</option>
-                            <option value="90">90 days</option>
-                            <option value="180">6 months</option>
-                            <option value="365">1 year</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Side</label>
-                        <select id="sl-side" class="w-full rounded px-3 py-2 border border-slate-700 text-sm">
-                            <option value="all" selected>Buy & Sell</option>
-                            <option value="buy">Buy only</option>
-                            <option value="sell">Sell only</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Outcome</label>
-                        <select id="sl-outcome" class="w-full rounded px-3 py-2 border border-slate-700 text-sm">
-                            <option value="all" selected>All</option>
-                            <option value="target">✓ Target hit</option>
-                            <option value="stop">✗ Stop hit</option>
-                            <option value="open">⏳ Open</option>
-                            <option value="timeout">⌛ Timed out</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Scanner</label>
-                        <select id="sl-scanner" class="w-full rounded px-3 py-2 border border-slate-700 text-sm">
-                            <option value="all" selected>All scanners</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="flex flex-wrap gap-2 items-center">
-                    <button id="sl-run" class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-                        Generate Log
-                    </button>
-                    <button id="sl-export" class="hidden px-3 py-2 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 border border-slate-700 hover:border-blue-500 hover:text-white transition" title="Download as CSV">
-                        ⤓ Export CSV
-                    </button>
-                    <div id="sl-status" class="text-xs text-slate-400 ml-auto"></div>
-                </div>
-            </div>
-
-            <!-- Summary cards -->
-            <div id="sl-summary" class="hidden grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-                <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">Total signals</div><div id="sl-total" class="text-lg font-bold text-white">--</div></div>
-                <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">Target hit</div><div id="sl-stat-target" class="text-lg font-bold text-emerald-400">--</div></div>
-                <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">Stop hit</div><div id="sl-stat-stop" class="text-lg font-bold text-red-400">--</div></div>
-                <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">Still open</div><div id="sl-stat-open" class="text-lg font-bold text-yellow-400">--</div></div>
-                <div class="glass-card rounded-lg p-3 border border-blue-500/30"><div class="text-xs text-blue-300 uppercase">Win rate (closed)</div><div id="sl-stat-winrate" class="text-lg font-bold">--</div></div>
-            </div>
-
-            <!-- Log table -->
-            <div id="sl-log-container" class="hidden glass-card rounded-xl p-4">
-                <div class="overflow-x-auto max-h-[70vh] overflow-y-auto">
-                    <table class="w-full text-sm text-left">
-                        <thead class="text-slate-400 text-xs uppercase border-b border-slate-700 sticky top-0 bg-slate-900">
-                            <tr>
-                                <th class="py-2">Signal Date</th>
-                                <th class="py-2">Symbol</th>
-                                <th class="py-2 hidden md:table-cell">Scanner</th>
-                                <th class="py-2">Side</th>
-                                <th class="py-2 text-right">Entry</th>
-                                <th class="py-2 text-right">Stop</th>
-                                <th class="py-2 text-right">Target</th>
-                                <th class="py-2">Outcome</th>
-                                <th class="py-2 text-right hidden sm:table-cell">Days</th>
-                                <th class="py-2 text-right">Return</th>
-                            </tr>
-                        </thead>
-                        <tbody id="sl-log-body" class="divide-y divide-slate-800"></tbody>
-                    </table>
-                </div>
-                <div id="sl-log-empty" class="hidden text-center text-slate-400 py-8">No signals match your filters.</div>
-            </div>
-        </div>
-
-        <!-- AI TRADING SIMULATOR VIEW -->
-        <div id="ai_trading-view" class="view view-hidden">
-            <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
-                <div>
-                    <h1 class="text-4xl font-bold text-white tracking-tight mb-1">AI Trading</h1>
-                    <p class="text-slate-400 text-sm">Simulate a portfolio that auto-trades based on scanner signals over historical data.</p>
-                </div>
-            </div>
-
-            <!-- Config panel -->
-            <div class="glass-card rounded-xl p-5 mb-4">
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    <div>
-                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Initial Capital (Rs.)</label>
-                        <input id="ai-capital" type="number" min="1000" step="1000" value="100000" class="w-full rounded px-3 py-2 border border-slate-700 text-sm" />
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Universe</label>
-                        <select id="ai-universe" class="w-full rounded px-3 py-2 border border-slate-700 text-sm"></select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Lookback</label>
-                        <select id="ai-lookback" class="w-full rounded px-3 py-2 border border-slate-700 text-sm">
-                            <option value="90">3 months</option>
-                            <option value="180">6 months</option>
-                            <option value="250" selected>1 year</option>
-                            <option value="500">2 years</option>
-                            <option value="1000">4 years</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Max Positions</label>
-                        <input id="ai-max-pos" type="number" min="1" max="50" value="10" class="w-full rounded px-3 py-2 border border-slate-700 text-sm" />
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 uppercase tracking-wider mb-1">Sell On</label>
-                        <select id="ai-sell-mode" class="w-full rounded px-3 py-2 border border-slate-700 text-sm">
-                            <option value="any" selected>Any sell signal OR stop/target</option>
-                            <option value="stoponly">Stop/target only</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="mt-4 pt-4 border-t border-slate-700 flex flex-wrap gap-2 items-center">
-                    <button id="ai-run" class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Run Simulation
-                    </button>
-                    <div id="ai-status" class="text-xs text-slate-400"></div>
-                </div>
-            </div>
-
-            <div id="ai-results" class="hidden">
-                <!-- Summary cards -->
-                <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
-                    <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">Starting</div><div id="ai-start" class="text-lg font-bold text-white">--</div></div>
-                    <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">Ending</div><div id="ai-end" class="text-lg font-bold text-white">--</div></div>
-                    <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">P&L</div><div id="ai-pnl" class="text-lg font-bold">--</div><div id="ai-pnl-pct" class="text-xs font-semibold">--</div></div>
-                    <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">Trades</div><div id="ai-trades" class="text-lg font-bold text-white">--</div><div id="ai-winrate" class="text-xs text-slate-400">--</div></div>
-                    <div class="glass-card rounded-lg p-3"><div class="text-xs text-slate-400">Max Drawdown</div><div id="ai-mdd" class="text-lg font-bold text-red-400">--</div></div>
-                    <div class="glass-card rounded-lg p-3 border border-blue-500/30"><div class="text-xs text-blue-300 uppercase font-semibold">vs Buy & Hold</div><div id="ai-vs-bh" class="text-lg font-bold">--</div></div>
-                </div>
-
-                <!-- Equity curve -->
-                <div class="glass-card rounded-xl p-4 mb-4">
-                    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Equity Curve</h3>
-                    <div id="ai-equity-chart" class="w-full" style="height: 300px;"></div>
-                </div>
-
-                <!-- Currently held -->
-                <div class="glass-card rounded-xl p-4 mb-4">
-                    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Final Holdings <span id="ai-holdings-count" class="text-slate-500"></span></h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left">
-                            <thead class="text-slate-400 text-xs uppercase border-b border-slate-700">
-                                <tr>
-                                    <th class="py-2">Symbol</th>
-                                    <th class="py-2 text-right">Qty</th>
-                                    <th class="py-2 text-right">Avg Cost</th>
-                                    <th class="py-2 text-right">Current</th>
-                                    <th class="py-2 text-right">P&L</th>
-                                    <th class="py-2 text-right">%</th>
-                                    <th class="py-2">Bought On</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ai-holdings-body" class="divide-y divide-slate-800"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Trade log -->
-                <div class="glass-card rounded-xl p-4">
-                    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Trade Log <span id="ai-tradelog-count" class="text-slate-500"></span></h3>
-                    <div class="overflow-x-auto max-h-96 overflow-y-auto">
-                        <table class="w-full text-sm text-left">
-                            <thead class="text-slate-400 text-xs uppercase border-b border-slate-700 sticky top-0 bg-slate-900">
-                                <tr>
-                                    <th class="py-2">Date</th>
-                                    <th class="py-2">Side</th>
-                                    <th class="py-2">Symbol</th>
-                                    <th class="py-2 text-right">Qty</th>
-                                    <th class="py-2 text-right">Price</th>
-                                    <th class="py-2 text-right">Net</th>
-                                    <th class="py-2 text-right">P&L</th>
-                                    <th class="py-2">Reason</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ai-tradelog-body" class="divide-y divide-slate-800"></tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -1823,6 +1633,9 @@
 
             // Show scanner signals (Buy/Sell evaluations) for this stock
             populateStockSignals(symbol);
+
+            // Seasonality (uses EOD cache populated by loadTradingView)
+            populateSeasonality(symbol);
         }
 
         // Filter helper: returns only entries that have non-empty, non-dash values
@@ -4026,759 +3839,271 @@
             });
         }
 
-        // ───── Signal Log ───────────────────────────────────────────
-        // Lists every historical signal in the chosen window with its outcome
-        // (target hit / stop hit / still open / timed out after N days).
-        let signalLogInited = false;
-        let signalLogData = [];
-
-        async function initSignalLogView() {
-            if (!Object.keys(marketWatchData).length) await loadMarketWatch();
-            if (!indexList.length) {
-                const data = await fetchAPI('/indices');
-                if (data) {
-                    indicesData = data;
-                    indexList = data.map(idx => {
-                        const friendly = INDEX_FRIENDLY[idx.name] || { name: idx.name, fullName: idx.name };
-                        INDEX_API_MAP[idx.name] = idx.name;
-                        return { id: idx.name, name: friendly.name, fullName: friendly.fullName };
-                    });
-                }
+        // ───── Seasonality Analysis ─────────────────────────────────────
+        // Wait briefly for loadTradingView to populate lastEodData[symbol].
+        async function _waitForEod(symbol, maxMs = 8000) {
+            const t0 = Date.now();
+            while (!lastEodData[symbol] || !lastEodData[symbol].length) {
+                if (Date.now() - t0 > maxMs) return null;
+                await new Promise(r => setTimeout(r, 150));
             }
-            if (!signalLogInited) {
-                signalLogInited = true;
-                const uSel = document.getElementById('sl-universe');
-                uSel.innerHTML = indexList.map(i => `<option value="${i.id}">${i.name}</option>`).join('') +
-                    '<option value="__all">All Stocks</option>';
-                uSel.value = 'KSE100';
-                const scnSel = document.getElementById('sl-scanner');
-                scnSel.innerHTML = '<option value="all" selected>All scanners</option>' +
-                    SCANNERS.map(s => `<option value="${s.key}">${s.title}</option>`).join('');
-
-                document.getElementById('sl-run').addEventListener('click', runSignalLog);
-                document.getElementById('sl-export').addEventListener('click', exportSignalLogCSV);
-                // Re-filter live when filter dropdowns change
-                ['sl-side', 'sl-outcome', 'sl-scanner'].forEach(id => {
-                    document.getElementById(id).addEventListener('change', renderSignalLog);
-                });
-            }
-            if (!prewarmDone && !prewarmInFlight) prewarmIndicators();
+            return lastEodData[symbol];
         }
 
-        async function runSignalLog() {
-            const status = document.getElementById('sl-status');
-            const runBtn = document.getElementById('sl-run');
-            runBtn.disabled = true;
+        async function populateSeasonality(symbol) {
+            const statusEl = document.getElementById('seasonality-status');
+            const chartsEl = document.getElementById('seasonality-charts');
+            const metaEl = document.getElementById('seasonality-meta');
+            if (!statusEl || !chartsEl) return;
+            statusEl.classList.remove('hidden');
+            chartsEl.classList.add('hidden');
+            statusEl.textContent = 'Loading seasonal data…';
 
-            if (!prewarmDone) {
-                while (!prewarmDone) {
-                    status.textContent = `Indicators loading: ${Object.keys(screenerIndicatorCache).length} / ${Object.keys(marketWatchData).length}`;
-                    await new Promise(r => setTimeout(r, 800));
-                }
-            }
+            const raw = await _waitForEod(symbol);
+            if (!raw || !raw.length) { statusEl.textContent = 'No historical data available.'; return; }
 
-            const universe = document.getElementById('sl-universe').value;
-            const lookback = parseInt(document.getElementById('sl-lookback').value) || 60;
-            const maxHold = 60;  // days to wait before declaring 'timed out'
+            // Build sorted ascending list {d:Date, close:number}
+            const rows = raw.slice()
+                .map(d => ({ d: new Date(d.timestamp * 1000), close: +d.close }))
+                .filter(r => r.close > 0 && !isNaN(r.d.getTime()))
+                .sort((a, b) => a.d - b.d);
+            if (rows.length < 250) { statusEl.textContent = 'Need at least ~1 year of data for seasonality.'; return; }
 
-            let candidates;
-            if (universe === '__all') candidates = Object.values(marketWatchData);
-            else {
-                const data = await fetchAPI('/index/' + universe);
-                candidates = data || [];
-            }
-            candidates = candidates.filter(c => {
-                const ind = screenerIndicatorCache[c.symbol];
-                return ind && ind._closes && ind._closes.length >= 260;
+            // Group by year
+            const byYear = new Map();
+            rows.forEach(r => {
+                const y = r.d.getFullYear();
+                if (!byYear.has(y)) byYear.set(y, []);
+                byYear.get(y).push(r);
             });
+            // Full years only: at least 200 trading days, with data in both Jan and Dec
+            const fullYears = [...byYear.entries()]
+                .filter(([y, arr]) => arr.length >= 200
+                    && arr[0].d.getMonth() <= 1
+                    && arr[arr.length - 1].d.getMonth() >= 10)
+                .map(([y]) => y)
+                .sort();
+            if (fullYears.length < 3) { statusEl.textContent = 'Need at least 3 full calendar years for seasonality. Only ' + fullYears.length + ' available.'; return; }
 
-            status.textContent = `Scanning ${candidates.length} stocks…`;
-            await new Promise(r => setTimeout(r, 50));
-
-            const log = [];
-            // Today's date (approx — uses the most recent EOD bar across stocks as "today")
-            const todayUnix = Math.floor(Date.now() / 1000);
-
-            for (let ci = 0; ci < candidates.length; ci++) {
-                const c = candidates[ci];
-                const ind = screenerIndicatorCache[c.symbol];
-                const closes = ind._closes;
-                const volumes = ind._volumes;
-                const len = closes.length;
-
-                // Reconstruct dates: most recent bar = today, going backwards by trading days
-                // (1 trading day ≈ 1 calendar day for display purposes)
-                const dateOf = (idx) => {
-                    const ts = todayUnix - (len - 1 - idx) * 86400;
-                    return new Date(ts * 1000).toISOString().split('T')[0];
-                };
-
-                // Precompute rolling indicators
-                const sma20 = rollingSMA(closes, 20);
-                const sma50 = rollingSMA(closes, 50);
-                const sma200 = rollingSMA(closes, 200);
-                const rsi = rollingRSI(closes, 14);
-                const macd = rollingMACD(closes);
-                const atr = rollingATR(closes, 14);
-                const r52 = rollingMaxMin(closes, 250);
-
-                // Loop over the last `lookback` trading days
-                const start = Math.max(250, len - lookback);
-                for (let i = start; i < len; i++) {
-                    if (!closes[i] || !closes[i-1]) continue;
-                    const d = {
-                        mw: { ...c, current: closes[i],
-                            changePercent: ((closes[i] - closes[i-1]) / closes[i-1]) * 100,
-                            volume: volumes[i], high: closes[i], low: closes[i], ldcp: closes[i-1] },
-                        rsi: rsi[i],
-                        sma20: sma20[i], sma50: sma50[i], sma200: sma200[i],
-                        sma50_prev: sma50[i-1], sma200_prev: sma200[i-1],
-                        macd: macd[i], macd_prev: macd[i-1],
-                        week52High: r52.max[i], week52Low: r52.min[i],
-                        avgVol20: (() => { let s = 0, n = 0; for (let j = Math.max(0, i-19); j <= i; j++) { s += volumes[j] || 0; n++; } return n > 0 ? s / n : 0; })(),
-                        atr14: atr[i],
-                        prevClose: closes[i-1]
-                    };
-                    SCANNERS.forEach(scanner => {
-                        try { if (!scanner.match(d)) return; } catch { return; }
-                        let levels;
-                        try { levels = scanner.levels(d); } catch { return; }
-                        if (!levels) return;
-                        const entry = closes[i];
-                        // Look forward to determine outcome
-                        const isBuy = scanner.signal === 'buy';
-                        let outcome = 'open';
-                        let exitPrice = null, exitDay = null;
-                        const horizon = Math.min(len - 1, i + maxHold);
-                        for (let f = i + 1; f <= horizon; f++) {
-                            const px = closes[f];
-                            if (isBuy) {
-                                if (px <= levels.stop)   { outcome = 'stop';   exitPrice = levels.stop;   exitDay = f; break; }
-                                if (px >= levels.target) { outcome = 'target'; exitPrice = levels.target; exitDay = f; break; }
-                            } else {
-                                if (px >= levels.stop)   { outcome = 'stop';   exitPrice = levels.stop;   exitDay = f; break; }
-                                if (px <= levels.target) { outcome = 'target'; exitPrice = levels.target; exitDay = f; break; }
-                            }
-                        }
-                        if (outcome === 'open') {
-                            // Did we run out of room within maxHold?
-                            if (horizon - i >= maxHold - 1 && horizon < len - 1) {
-                                outcome = 'timeout';
-                                exitPrice = closes[horizon];
-                                exitDay = horizon;
-                            }
-                            // Else: still open (no exit yet within available data)
-                        }
-                        const returnPct = exitPrice != null
-                            ? (isBuy ? (exitPrice - entry) / entry * 100 : (entry - exitPrice) / entry * 100)
-                            : (isBuy ? (closes[len-1] - entry) / entry * 100 : (entry - closes[len-1]) / entry * 100);
-                        log.push({
-                            signalDate: dateOf(i),
-                            signalDayIndex: i,
-                            symbol: c.symbol,
-                            symbolName: c.name || '',
-                            scanner: scanner.key,
-                            scannerTitle: scanner.title,
-                            side: scanner.signal,
-                            entry, stop: levels.stop, target: levels.target,
-                            outcome, exitPrice, exitDay,
-                            daysToOutcome: exitDay != null ? exitDay - i : null,
-                            returnPct,
-                            currentPrice: closes[len-1]
-                        });
-                    });
+            // ── Composite curve (day-of-year → average % of annual mean)
+            // For each year: compute mean close, then store close/mean*100 at its DOY.
+            const bucket = Array.from({ length: 366 }, () => []);
+            fullYears.forEach(y => {
+                const arr = byYear.get(y);
+                const mean = arr.reduce((s, r) => s + r.close, 0) / arr.length;
+                if (!(mean > 0)) return;
+                // Forward-fill close for each DOY so weekends/holidays get a value
+                let lastVal = null;
+                const filled = new Array(366).fill(null);
+                // Map trading days to their DOY first
+                const arrByDoy = new Array(366).fill(null);
+                arr.forEach(r => {
+                    const start = new Date(r.d.getFullYear(), 0, 0);
+                    const diff = (r.d - start) + ((start.getTimezoneOffset() - r.d.getTimezoneOffset()) * 60 * 1000);
+                    const doy = Math.floor(diff / 86400000); // 1..365/366
+                    if (doy >= 1 && doy <= 365) arrByDoy[doy] = r.close;
+                });
+                for (let i = 1; i <= 365; i++) {
+                    if (arrByDoy[i] != null) lastVal = arrByDoy[i];
+                    if (lastVal != null) filled[i] = lastVal / mean * 100;
                 }
-
-                if (ci % 25 === 0) {
-                    status.textContent = `Scanning… ${ci+1} / ${candidates.length}`;
-                    await new Promise(r => setTimeout(r, 0));
+                for (let i = 1; i <= 365; i++) if (filled[i] != null) bucket[i].push(filled[i]);
+            });
+            const composite = new Array(366).fill(null);
+            for (let i = 1; i <= 365; i++) {
+                if (bucket[i].length >= Math.max(3, Math.floor(fullYears.length * 0.5))) {
+                    composite[i] = bucket[i].reduce((s, v) => s + v, 0) / bucket[i].length;
                 }
             }
+            // Smooth with 14-day centered moving avg
+            const smooth = new Array(366).fill(null);
+            const W = 7;
+            for (let i = 1; i <= 365; i++) {
+                let s = 0, c = 0;
+                for (let j = i - W; j <= i + W; j++) {
+                    if (j >= 1 && j <= 365 && composite[j] != null) { s += composite[j]; c++; }
+                }
+                if (c > 0) smooth[i] = s / c;
+            }
+            // Find seasonal high/low DOY (on smoothed curve)
+            let hiI = 1, loI = 1;
+            for (let i = 1; i <= 365; i++) {
+                if (smooth[i] == null) continue;
+                if (smooth[hiI] == null || smooth[i] > smooth[hiI]) hiI = i;
+                if (smooth[loI] == null || smooth[i] < smooth[loI]) loI = i;
+            }
 
-            // ── Dedupe per (day, symbol) ──
-            // If multiple scanners fire on the same stock on the same day,
-            // collapse to a single row. Keep the highest-R:R scanner's
-            // entry/stop/target/outcome but record all firing scanner names.
-            const consolidated = new Map();
-            for (const r of log) {
-                const key = `${r.signalDayIndex}|${r.symbol}|${r.side}`;
-                const rr = computeRR({ entry: r.entry, stop: r.stop, target: r.target }, r.side) ?? 0;
-                let g = consolidated.get(key);
-                if (!g) {
-                    g = {
-                        ...r,
-                        scannerTitles: [r.scannerTitle],
-                        scannerKeys: [r.scanner],
-                        bestRR: rr,
-                        bestScannerTitle: r.scannerTitle
-                    };
-                    consolidated.set(key, g);
-                } else {
-                    g.scannerTitles.push(r.scannerTitle);
-                    g.scannerKeys.push(r.scanner);
-                    if (rr > g.bestRR) {
-                        // Better R:R → adopt this scanner's levels & forward outcome
-                        g.bestRR = rr;
-                        g.entry = r.entry; g.stop = r.stop; g.target = r.target;
-                        g.scanner = r.scanner; g.scannerTitle = r.scannerTitle;
-                        g.bestScannerTitle = r.scannerTitle;
-                        g.outcome = r.outcome; g.exitPrice = r.exitPrice;
-                        g.exitDay = r.exitDay; g.daysToOutcome = r.daysToOutcome;
-                        g.returnPct = r.returnPct;
+            // ── Monthly returns: (lastClose - prevMonthLastClose) / prev * 100
+            // Use last close of each month per year.
+            const monthLastClose = new Map(); // key "YYYY-MM" → close
+            rows.forEach(r => {
+                const k = r.d.getFullYear() + '-' + r.d.getMonth();
+                monthLastClose.set(k, r.close); // overwrites — last wins (since rows are ascending)
+            });
+            const monthlyReturns = Array.from({ length: 12 }, () => []);
+            fullYears.forEach(y => {
+                for (let m = 0; m < 12; m++) {
+                    const cur = monthLastClose.get(y + '-' + m);
+                    // previous month: m-1 of same year, or m=11 of y-1 when m=0
+                    const pm = m === 0 ? 11 : m - 1;
+                    const py = m === 0 ? y - 1 : y;
+                    const prev = monthLastClose.get(py + '-' + pm);
+                    if (cur != null && prev != null && prev > 0) {
+                        monthlyReturns[m].push((cur - prev) / prev * 100);
                     }
                 }
-            }
-            // Now group by day and cap at 5 per day (ranked by signal_count × 10 + best_RR)
-            const byDay = new Map();
-            for (const g of consolidated.values()) {
-                let arr = byDay.get(g.signalDayIndex);
-                if (!arr) { arr = []; byDay.set(g.signalDayIndex, arr); }
-                arr.push(g);
-            }
-            const finalLog = [];
-            for (const arr of byDay.values()) {
-                arr.sort((a, b) => (b.scannerTitles.length * 10 + b.bestRR) - (a.scannerTitles.length * 10 + a.bestRR));
-                arr.slice(0, 5).forEach(r => finalLog.push(r));
-            }
+            });
+            const monthlyAvg = monthlyReturns.map(arr => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null);
 
-            // Sort by signal date descending (most recent first)
-            finalLog.sort((a, b) => b.signalDayIndex - a.signalDayIndex || a.symbol.localeCompare(b.symbol));
-            signalLogData = finalLog;
-            status.textContent = `Showing ${finalLog.length} top suggestions (max 5 per day, deduped).`;
-            runBtn.disabled = false;
-            renderSignalLog();
-        }
-
-        function renderSignalLog() {
-            const sideFilter = document.getElementById('sl-side').value;
-            const outcomeFilter = document.getElementById('sl-outcome').value;
-            const scannerFilter = document.getElementById('sl-scanner').value;
-
-            const filtered = signalLogData.filter(r => {
-                if (sideFilter !== 'all' && r.side !== sideFilter) return false;
-                if (outcomeFilter !== 'all' && r.outcome !== outcomeFilter) return false;
-                if (scannerFilter !== 'all') {
-                    // Match against any of the firing scanners in this consolidated row
-                    const keys = r.scannerKeys || [r.scanner];
-                    if (!keys.includes(scannerFilter)) return false;
+            // ── 6-month forward: enter at first close of month, exit at first close 6 months later
+            // For "first close of (Y,M)": find the earliest row in that calendar month.
+            const monthFirstClose = new Map();
+            rows.forEach(r => {
+                const k = r.d.getFullYear() + '-' + r.d.getMonth();
+                if (!monthFirstClose.has(k)) monthFirstClose.set(k, r.close);
+            });
+            const fwd = Array.from({ length: 12 }, () => []);
+            fullYears.forEach(y => {
+                for (let m = 0; m < 12; m++) {
+                    const entry = monthFirstClose.get(y + '-' + m);
+                    let ey = y, em = m + 6;
+                    if (em >= 12) { ey += 1; em -= 12; }
+                    const exit = monthFirstClose.get(ey + '-' + em);
+                    if (entry != null && exit != null && entry > 0) {
+                        fwd[m].push((exit - entry) / entry * 100);
+                    }
                 }
-                return true;
             });
+            const fwdAvg = fwd.map(arr => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null);
 
-            document.getElementById('sl-summary').classList.remove('hidden');
-            document.getElementById('sl-log-container').classList.remove('hidden');
-            document.getElementById('sl-export').classList.remove('hidden');
+            // ── Render
+            metaEl.textContent = `Years: ${fullYears[0]}–${fullYears[fullYears.length - 1]} (${fullYears.length} full years)`;
+            document.getElementById('seas-title-1').textContent =
+                `Seasonal Composite (detrended, avg of full years ${fullYears[0]}–${fullYears[fullYears.length - 1]}) — each year scaled to its own annual avg = 100`;
 
-            // Summary stats
-            const total = filtered.length;
-            const tgt = filtered.filter(r => r.outcome === 'target').length;
-            const stp = filtered.filter(r => r.outcome === 'stop').length;
-            const opn = filtered.filter(r => r.outcome === 'open').length;
-            const closedCount = tgt + stp;
-            const winRate = closedCount > 0 ? (tgt / closedCount) * 100 : 0;
-            document.getElementById('sl-total').textContent = total;
-            document.getElementById('sl-stat-target').textContent = tgt;
-            document.getElementById('sl-stat-stop').textContent = stp;
-            document.getElementById('sl-stat-open').textContent = opn;
-            const wr = document.getElementById('sl-stat-winrate');
-            wr.textContent = closedCount > 0 ? `${winRate.toFixed(1)}% (${tgt}/${closedCount})` : '—';
-            wr.className = 'text-lg font-bold ' + (winRate >= 50 ? 'text-emerald-400' : 'text-red-400');
-
-            const body = document.getElementById('sl-log-body');
-            const empty = document.getElementById('sl-log-empty');
-            body.innerHTML = '';
-            if (filtered.length === 0) {
-                empty.classList.remove('hidden');
-                return;
-            }
-            empty.classList.add('hidden');
-
-            // Render up to 500 rows for performance; show count if truncated
-            const slice = filtered.slice(0, 500);
-            slice.forEach(r => {
-                const isBuy = r.side === 'buy';
-                let outcomeChip = '';
-                if (r.outcome === 'target') outcomeChip = '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">✓ Target</span>';
-                else if (r.outcome === 'stop') outcomeChip = '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/40">✗ Stop</span>';
-                else if (r.outcome === 'open') outcomeChip = '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-yellow-500/20 text-yellow-400 border border-yellow-500/40">⏳ Open</span>';
-                else if (r.outcome === 'timeout') outcomeChip = '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-500/20 text-slate-300 border border-slate-500/40">⌛ Timeout</span>';
-
-                const sideChip = isBuy
-                    ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400">BUY</span>'
-                    : '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400">SELL</span>';
-
-                const retColor = r.returnPct > 0 ? 'text-emerald-400' : r.returnPct < 0 ? 'text-red-400' : 'text-slate-400';
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-slate-800/30 cursor-pointer';
-                tr.onclick = () => {
-                    const mw = marketWatchData[r.symbol];
-                    const idx = (mw?.listedIn || '').split(/\s+/).find(t => INDEX_FRIENDLY[t]) || 'KSE100';
-                    openStock(r.symbol, idx);
-                };
-                // Build the scanner cell — show all firing scanners (the best one drives the levels)
-                const titles = r.scannerTitles || [r.scannerTitle];
-                let scannerCellHTML;
-                if (titles.length === 1) {
-                    scannerCellHTML = `<span class="text-xs text-slate-300">${titles[0]}</span>`;
-                } else {
-                    // Best one highlighted, extras shown after a "+N" tag
-                    const extras = titles.filter(t => t !== r.bestScannerTitle);
-                    scannerCellHTML = `<span class="text-xs text-slate-200 font-semibold">${r.bestScannerTitle}</span>` +
-                        ` <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/40" title="${extras.join(', ')}">+${extras.length}</span>`;
-                }
-                tr.innerHTML = `
-                    <td class="py-2 text-slate-400 text-xs">${r.signalDate}</td>
-                    <td class="py-2 font-bold text-blue-400">${r.symbol}</td>
-                    <td class="py-2 hidden md:table-cell">${scannerCellHTML}</td>
-                    <td class="py-2">${sideChip}</td>
-                    <td class="py-2 text-right font-mono">${r.entry.toFixed(2)}</td>
-                    <td class="py-2 text-right font-mono text-red-300">${r.stop.toFixed(2)}</td>
-                    <td class="py-2 text-right font-mono text-emerald-300">${r.target.toFixed(2)}</td>
-                    <td class="py-2">${outcomeChip}</td>
-                    <td class="py-2 text-right text-slate-400 hidden sm:table-cell">${r.daysToOutcome != null ? r.daysToOutcome + 'd' : '—'}</td>
-                    <td class="py-2 text-right font-mono ${retColor}">${r.returnPct >= 0 ? '+' : ''}${r.returnPct.toFixed(2)}%</td>
-                `;
-                body.appendChild(tr);
-            });
-            if (filtered.length > 500) {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td colspan="10" class="py-3 text-center text-slate-500 text-xs">… ${filtered.length - 500} more signals not shown. Use filters to narrow or Export CSV for the full list.</td>`;
-                body.appendChild(tr);
-            }
-        }
-
-        function exportSignalLogCSV() {
-            const sideFilter = document.getElementById('sl-side').value;
-            const outcomeFilter = document.getElementById('sl-outcome').value;
-            const scannerFilter = document.getElementById('sl-scanner').value;
-            const rows = signalLogData.filter(r => {
-                if (sideFilter !== 'all' && r.side !== sideFilter) return false;
-                if (outcomeFilter !== 'all' && r.outcome !== outcomeFilter) return false;
-                if (scannerFilter !== 'all' && r.scanner !== scannerFilter) return false;
-                return true;
-            });
-            const header = ['Signal Date','Symbol','Company','Scanners','Side','Entry','Stop','Target','Outcome','Days to Outcome','Exit Price','Return %'];
-            const lines = rows.map(r => {
-                const allScanners = (r.scannerTitles || [r.scannerTitle]).join(' | ');
-                return [
-                    r.signalDate, r.symbol, '"' + (r.symbolName || '').replace(/"/g, '""') + '"',
-                    '"' + allScanners.replace(/"/g, '""') + '"', r.side,
-                    r.entry.toFixed(2), r.stop.toFixed(2), r.target.toFixed(2),
-                    r.outcome, r.daysToOutcome ?? '', r.exitPrice ? r.exitPrice.toFixed(2) : '',
-                    r.returnPct.toFixed(2)
-                ].join(',');
-            });
-            const csv = [header.join(','), ...lines].join('\n');
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `psx_signal_log_${new Date().toISOString().split('T')[0]}.csv`;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        // ───── AI Trading simulator ─────────────────────────────────
-        let aiTradingInited = false;
-        let aiEquityChart = null;
-        let aiEquitySeries = null;
-        let aiBenchSeries = null;
-
-        async function initAITradingView() {
-            if (!Object.keys(marketWatchData).length) await loadMarketWatch();
-            if (!indexList.length) {
-                const data = await fetchAPI('/indices');
-                if (data) {
-                    indicesData = data;
-                    indexList = data.map(idx => {
-                        const friendly = INDEX_FRIENDLY[idx.name] || { name: idx.name, fullName: idx.name };
-                        INDEX_API_MAP[idx.name] = idx.name;
-                        return { id: idx.name, name: friendly.name, fullName: friendly.fullName };
-                    });
-                }
-            }
-            if (!aiTradingInited) {
-                aiTradingInited = true;
-                const sel = document.getElementById('ai-universe');
-                sel.innerHTML = indexList.map(i => `<option value="${i.id}">${i.name}</option>`).join('') +
-                    '<option value="__all">All Stocks</option>';
-                // Default to KSE-100
-                sel.value = 'KSE100';
-                document.getElementById('ai-run').addEventListener('click', runAITrading);
-            }
-            if (!prewarmDone && !prewarmInFlight) prewarmIndicators();
-        }
-
-        async function runAITrading() {
-            const status = document.getElementById('ai-status');
-            const runBtn = document.getElementById('ai-run');
-            runBtn.disabled = true;
-            status.textContent = 'Waiting for indicator data…';
-
-            if (!prewarmDone) {
-                while (!prewarmDone) {
-                    status.textContent = `Indicators loading: ${Object.keys(screenerIndicatorCache).length} / ${Object.keys(marketWatchData).length}`;
-                    await new Promise(r => setTimeout(r, 800));
-                }
-            }
-
-            const initialCapital = parseFloat(document.getElementById('ai-capital').value) || 100000;
-            const universe = document.getElementById('ai-universe').value;
-            const lookback = parseInt(document.getElementById('ai-lookback').value) || 250;
-            const maxPositions = parseInt(document.getElementById('ai-max-pos').value) || 10;
-            const sellMode = document.getElementById('ai-sell-mode').value;
-
-            // Build candidate stock list
-            let candidates;
-            if (universe === '__all') candidates = Object.values(marketWatchData);
-            else {
-                const data = await fetchAPI('/index/' + universe);
-                candidates = data || [];
-            }
-            // Filter to stocks with enough EOD data
-            candidates = candidates.filter(c => {
-                const ind = screenerIndicatorCache[c.symbol];
-                return ind && ind._closes && ind._closes.length >= 260;
-            });
-            if (candidates.length === 0) {
-                status.textContent = 'No stocks with sufficient history in this universe.';
-                runBtn.disabled = false;
-                return;
-            }
-            status.textContent = `Simulating across ${candidates.length} stocks…`;
-            await new Promise(r => setTimeout(r, 50));
-
-            const result = simulateAITrading(candidates, initialCapital, lookback, maxPositions, sellMode);
-
-            status.textContent = `Done — ${result.trades.length} trades over ${result.equity.length} days.`;
-            runBtn.disabled = false;
-            renderAITradingResults(result, initialCapital);
-        }
-
-        // The actual simulator. Walks day-by-day through the lookback window.
-        // Each day's logic:
-        //   1. Exit any held position whose sell signal fires, or whose stop/target hit.
-        //   2. With remaining cash, score every candidate by # of buy signals × 10 + best R:R.
-        //      Buy top candidates (one share at a time, in order) until cash runs out
-        //      or we hit maxPositions.
-        //   3. Mark to market: portfolio value = cash + sum(qty × close) of held positions.
-        function simulateAITrading(candidates, initialCapital, lookback, maxPositions, sellMode) {
-            const settings = loadSettings();
-
-            // Precompute rolling indicators per stock; build a "by date" lookup keyed by date string.
-            // Also figure out the common date axis (intersection of all stocks' dates).
-            const perStock = {};
-            const allDateSet = new Set();
-            candidates.forEach(c => {
-                const ind = screenerIndicatorCache[c.symbol];
-                const closes = ind._closes;
-                const volumes = ind._volumes;
-                if (!closes || closes.length < 260) return;
-                // Build dates array: PSX EOD is timestamp-based; we used reverse() during fetch but
-                // didn't keep the timestamps client-side. Reconstruct day indices instead — use
-                // index-into-array as the time axis. Indexes align across stocks because all PSX
-                // EODs are aligned to trading days.
-                const sma20  = rollingSMA(closes, 20);
-                const sma50  = rollingSMA(closes, 50);
-                const sma200 = rollingSMA(closes, 200);
-                const rsi    = rollingRSI(closes, 14);
-                const macd   = rollingMACD(closes);
-                const atr    = rollingATR(closes, 14);
-                const r52    = rollingMaxMin(closes, 250);
-                perStock[c.symbol] = {
-                    mw: c, closes, volumes,
-                    sma20, sma50, sma200, rsi, macd, atr, r52,
-                    len: closes.length
-                };
-                for (let i = 0; i < closes.length; i++) allDateSet.add(i);
-            });
-
-            // The longest history determines simulation length
-            const maxLen = Math.max(...Object.values(perStock).map(p => p.len));
-            const startIdx = Math.max(250, maxLen - lookback);
-            const endIdx = maxLen - 1;
-
-            // Build a helper to compute the indicator object as-of day-i for one stock
-            const indicatorAt = (p, i) => {
-                if (i < 1 || i >= p.len) return null;
-                return {
-                    mw: { ...p.mw, current: p.closes[i],
-                        changePercent: ((p.closes[i] - p.closes[i-1]) / p.closes[i-1]) * 100,
-                        volume: p.volumes[i], high: p.closes[i], low: p.closes[i], ldcp: p.closes[i-1]
-                    },
-                    rsi: p.rsi[i],
-                    sma20: p.sma20[i], sma50: p.sma50[i], sma200: p.sma200[i],
-                    sma50_prev: p.sma50[i-1], sma200_prev: p.sma200[i-1],
-                    macd: p.macd[i], macd_prev: p.macd[i-1],
-                    week52High: p.r52.max[i], week52Low: p.r52.min[i],
-                    avgVol20: (() => {
-                        let s = 0, n = 0;
-                        for (let j = Math.max(0, i-19); j <= i; j++) { s += p.volumes[j] || 0; n++; }
-                        return n > 0 ? s / n : 0;
-                    })(),
-                    atr14: p.atr[i],
-                    prevClose: p.closes[i-1]
-                };
+            const doyToLabel = (doy) => {
+                const dt = new Date(2001, 0, 1);
+                dt.setDate(doy);
+                return dt.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
             };
 
-            const buyScanners  = SCANNERS.filter(s => s.signal === 'buy');
-            const sellScanners = SCANNERS.filter(s => s.signal === 'sell');
+            document.getElementById('seas-chart-composite').innerHTML = renderCompositeSVG(smooth, hiI, loI, doyToLabel);
+            document.getElementById('seas-chart-monthly').innerHTML = renderMonthlyBarsSVG(monthlyAvg);
+            document.getElementById('seas-chart-forward').innerHTML = renderForwardBarsSVG(fwdAvg);
 
-            let cash = initialCapital;
-            const positions = {}; // symbol -> { qty, avgCost, totalCost, entryDay, entryReason, entryLevels }
-            const trades = [];     // chronological log
-            const equity = [];     // [{day, value, cash}] per day
-
-            // For "vs Buy & Hold" benchmark, buy KSE-100 equivalent (use first stock as proxy).
-            // Better: use universe-average return.
-            const benchValues = [];
-            const benchAnchor = candidates.map(c => perStock[c.symbol]?.closes[startIdx]).filter(Boolean);
-            const benchAvgStart = benchAnchor.length ? benchAnchor.reduce((a,b)=>a+b,0) / benchAnchor.length : 0;
-
-            // Allocation per new position
-            const allocPerTrade = initialCapital / maxPositions;
-
-            for (let day = startIdx; day <= endIdx; day++) {
-                // ─── 1. EXITS ───
-                const exitSymbols = [];
-                for (const sym in positions) {
-                    const pos = positions[sym];
-                    const p = perStock[sym];
-                    if (!p || day >= p.len) { exitSymbols.push(sym); continue; }
-                    const px = p.closes[day];
-                    if (px == null) continue;
-                    const d = indicatorAt(p, day);
-                    if (!d) continue;
-
-                    let exitReason = null;
-                    let exitPrice = px;
-                    // Stop hit?
-                    if (px <= pos.entryLevels.stop) {
-                        exitReason = 'Stop hit'; exitPrice = pos.entryLevels.stop;
-                    }
-                    // Target hit?
-                    else if (px >= pos.entryLevels.target) {
-                        exitReason = 'Target hit'; exitPrice = pos.entryLevels.target;
-                    }
-                    // Sell signal?
-                    else if (sellMode === 'any') {
-                        const firingSell = sellScanners.find(s => { try { return s.match(d); } catch { return false; } });
-                        if (firingSell) { exitReason = `Sell signal: ${firingSell.title}`; exitPrice = px; }
-                    }
-
-                    if (exitReason) {
-                        const grossProceeds = pos.qty * exitPrice;
-                        const commission = calculateCommission(exitPrice, pos.qty, settings);
-                        const netProceeds = grossProceeds - commission;
-                        const pnl = netProceeds - pos.totalCost;
-                        cash += netProceeds;
-                        trades.push({
-                            day, side: 'sell', symbol: sym, qty: pos.qty,
-                            price: exitPrice, gross: grossProceeds, commission, net: netProceeds,
-                            pnl, reason: exitReason
-                        });
-                        exitSymbols.push(sym);
-                    }
-                }
-                exitSymbols.forEach(s => delete positions[s]);
-
-                // ─── 2. ENTRIES ───
-                const openCount = Object.keys(positions).length;
-                const room = maxPositions - openCount;
-                if (room > 0 && cash > 100) {
-                    // Score all candidates not currently held
-                    const scored = [];
-                    candidates.forEach(c => {
-                        if (positions[c.symbol]) return;
-                        const p = perStock[c.symbol];
-                        if (!p || day >= p.len) return;
-                        const d = indicatorAt(p, day);
-                        if (!d) return;
-                        const matched = buyScanners.filter(s => { try { return s.match(d); } catch { return false; } });
-                        if (matched.length === 0) return;
-                        // Best R:R among matched
-                        let bestRR = 0, bestLevels = null, bestScanner = null;
-                        matched.forEach(s => {
-                            try {
-                                const lv = s.levels(d);
-                                if (!lv) return;
-                                const rr = computeRR(lv, 'buy');
-                                if (rr != null && rr > bestRR) {
-                                    bestRR = rr; bestLevels = lv; bestScanner = s;
-                                }
-                            } catch {}
-                        });
-                        if (!bestLevels) return;
-                        const score = matched.length * 10 + bestRR;
-                        scored.push({ sym: c.symbol, data: d, score, levels: bestLevels, scanner: bestScanner, matched });
-                    });
-                    scored.sort((a, b) => b.score - a.score);
-
-                    for (const cand of scored.slice(0, room)) {
-                        const entryPx = cand.data.mw.current;
-                        // Spend allocPerTrade (but no more than available cash)
-                        const budget = Math.min(allocPerTrade, cash);
-                        const qty = Math.floor(budget / entryPx);
-                        if (qty < 1) continue;
-                        const gross = qty * entryPx;
-                        const commission = calculateCommission(entryPx, qty, settings);
-                        const totalCost = gross + commission;
-                        if (totalCost > cash) continue;
-                        cash -= totalCost;
-                        positions[cand.sym] = {
-                            qty, avgCost: totalCost / qty, totalCost,
-                            entryDay: day, entryPrice: entryPx,
-                            entryReason: cand.matched.map(s => s.title).join(', '),
-                            entryLevels: cand.levels
-                        };
-                        trades.push({
-                            day, side: 'buy', symbol: cand.sym, qty,
-                            price: entryPx, gross, commission, net: -totalCost,
-                            pnl: 0, reason: cand.matched.map(s => s.title).join(' + ')
-                        });
-                    }
-                }
-
-                // ─── 3. MARK TO MARKET ───
-                let value = cash;
-                for (const sym in positions) {
-                    const p = perStock[sym];
-                    if (!p || day >= p.len) continue;
-                    value += positions[sym].qty * p.closes[day];
-                }
-                equity.push({ day, value, cash });
-
-                // Benchmark = equal-weight buy-and-hold of all candidates from day startIdx
-                let benchTotal = 0, benchCount = 0;
-                candidates.forEach(c => {
-                    const p = perStock[c.symbol];
-                    if (!p || day >= p.len || startIdx >= p.len) return;
-                    benchTotal += p.closes[day] / p.closes[startIdx];
-                    benchCount++;
-                });
-                const benchValue = benchCount > 0 ? initialCapital * (benchTotal / benchCount) : initialCapital;
-                benchValues.push({ day, value: benchValue });
-            }
-
-            return { trades, equity, benchValues, positions, candidates, perStock, startIdx, endIdx };
+            statusEl.classList.add('hidden');
+            chartsEl.classList.remove('hidden');
         }
 
-        function renderAITradingResults(result, initialCapital) {
-            const container = document.getElementById('ai-results');
-            container.classList.remove('hidden');
+        function renderCompositeSVG(smooth, hiI, loI, doyToLabel) {
+            const W = 1000, H = 320, padL = 50, padR = 20, padT = 40, padB = 30;
+            const pts = [];
+            for (let i = 1; i <= 365; i++) if (smooth[i] != null) pts.push([i, smooth[i]]);
+            if (!pts.length) return '<div class="text-center text-slate-500 py-6">Insufficient data.</div>';
+            const yMin = Math.min(100, ...pts.map(p => p[1])) - 1;
+            const yMax = Math.max(100, ...pts.map(p => p[1])) + 1;
+            const xOf = doy => padL + (doy - 1) / 364 * (W - padL - padR);
+            const yOf = v => padT + (1 - (v - yMin) / (yMax - yMin)) * (H - padT - padB);
 
-            const finalEquity = result.equity[result.equity.length - 1]?.value || initialCapital;
-            const pnl = finalEquity - initialCapital;
-            const pnlPct = (pnl / initialCapital) * 100;
-            const finalBench = result.benchValues[result.benchValues.length - 1]?.value || initialCapital;
-            const benchPct = ((finalBench - initialCapital) / initialCapital) * 100;
-            const vsBh = pnlPct - benchPct;
+            // y-axis ticks (5 nice)
+            const yTicks = [];
+            const step = Math.max(1, Math.round((yMax - yMin) / 5));
+            const lo = Math.floor(yMin), hi = Math.ceil(yMax);
+            for (let v = lo; v <= hi; v += step) yTicks.push(v);
 
-            // Win rate (closed trades only)
-            const closed = result.trades.filter(t => t.side === 'sell');
-            const wins = closed.filter(t => t.pnl > 0);
-            const winRate = closed.length > 0 ? (wins.length / closed.length) * 100 : 0;
+            // Build path + areas split at y=100
+            let above = '', below = '';
+            const y100 = yOf(100);
+            // Construct full polyline once
+            const linePath = pts.map((p, i) => (i ? 'L' : 'M') + xOf(p[0]).toFixed(1) + ',' + yOf(p[1]).toFixed(1)).join(' ');
+            // Areas: clip via two filled polygons (one above 100 clipped to y<=y100, one below)
+            const areaPathTop = `M${xOf(pts[0][0]).toFixed(1)},${y100} ` +
+                pts.map(p => `L${xOf(p[0]).toFixed(1)},${Math.min(yOf(p[1]), y100).toFixed(1)}`).join(' ') +
+                ` L${xOf(pts[pts.length - 1][0]).toFixed(1)},${y100} Z`;
+            const areaPathBot = `M${xOf(pts[0][0]).toFixed(1)},${y100} ` +
+                pts.map(p => `L${xOf(p[0]).toFixed(1)},${Math.max(yOf(p[1]), y100).toFixed(1)}`).join(' ') +
+                ` L${xOf(pts[pts.length - 1][0]).toFixed(1)},${y100} Z`;
 
-            // Max drawdown
-            let peak = -Infinity, mdd = 0;
-            result.equity.forEach(e => {
-                if (e.value > peak) peak = e.value;
-                const dd = (peak - e.value) / peak;
-                if (dd > mdd) mdd = dd;
-            });
+            // Month label ticks (1st of each month, DOY)
+            const monthStarts = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335];
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-            const fmt = (n) => 'Rs. ' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
-            document.getElementById('ai-start').textContent = fmt(initialCapital);
-            document.getElementById('ai-end').textContent = fmt(finalEquity);
-            const pnlEl = document.getElementById('ai-pnl');
-            pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmt(pnl);
-            pnlEl.className = 'text-lg font-bold ' + (pnl >= 0 ? 'text-emerald-400' : 'text-red-400');
-            const pnlPctEl = document.getElementById('ai-pnl-pct');
-            pnlPctEl.textContent = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%';
-            pnlPctEl.className = 'text-xs font-semibold ' + (pnl >= 0 ? 'text-emerald-400' : 'text-red-400');
-            document.getElementById('ai-trades').textContent = result.trades.length;
-            document.getElementById('ai-winrate').textContent = closed.length ? `${winRate.toFixed(0)}% win rate (${wins.length}/${closed.length})` : 'No closed trades';
-            document.getElementById('ai-mdd').textContent = '-' + (mdd * 100).toFixed(2) + '%';
-            const vsEl = document.getElementById('ai-vs-bh');
-            vsEl.textContent = (vsBh >= 0 ? '+' : '') + vsBh.toFixed(2) + '%';
-            vsEl.className = 'text-lg font-bold ' + (vsBh >= 0 ? 'text-emerald-400' : 'text-red-400');
-            vsEl.title = `Benchmark (equal-weight buy & hold of universe) returned ${benchPct.toFixed(2)}%`;
+            const xHi = xOf(hiI), xLo = xOf(loI);
 
-            // Equity curve chart
-            renderEquityCurve(result, initialCapital);
-
-            // Final holdings table
-            const holdingsBody = document.getElementById('ai-holdings-body');
-            holdingsBody.innerHTML = '';
-            const holdingSyms = Object.keys(result.positions);
-            document.getElementById('ai-holdings-count').textContent = `(${holdingSyms.length})`;
-            holdingSyms.forEach(sym => {
-                const pos = result.positions[sym];
-                const p = result.perStock[sym];
-                const lastClose = p.closes[Math.min(result.endIdx, p.len - 1)];
-                const value = pos.qty * lastClose;
-                const pnlVal = value - pos.totalCost;
-                const pnlPct = (pnlVal / pos.totalCost) * 100;
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="py-2 font-bold text-blue-400">${sym}</td>
-                    <td class="py-2 text-right">${pos.qty}</td>
-                    <td class="py-2 text-right font-mono">${pos.avgCost.toFixed(2)}</td>
-                    <td class="py-2 text-right font-mono">${lastClose.toFixed(2)}</td>
-                    <td class="py-2 text-right font-mono ${pnlVal >= 0 ? 'text-emerald-400' : 'text-red-400'}">${pnlVal >= 0 ? '+' : ''}${pnlVal.toFixed(2)}</td>
-                    <td class="py-2 text-right ${pnlVal >= 0 ? 'text-emerald-400' : 'text-red-400'}">${pnlVal >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%</td>
-                    <td class="py-2 text-slate-400 text-xs">Day ${pos.entryDay} (${pos.entryReason})</td>
-                `;
-                holdingsBody.appendChild(tr);
-            });
-
-            // Trade log (most recent first)
-            const tradelogBody = document.getElementById('ai-tradelog-body');
-            tradelogBody.innerHTML = '';
-            document.getElementById('ai-tradelog-count').textContent = `(${result.trades.length})`;
-            [...result.trades].reverse().slice(0, 200).forEach(t => {
-                const isBuy = t.side === 'buy';
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="py-1.5 text-slate-400 text-xs">Day ${t.day}</td>
-                    <td class="py-1.5"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}">${t.side}</span></td>
-                    <td class="py-1.5 font-bold text-blue-400">${t.symbol}</td>
-                    <td class="py-1.5 text-right">${t.qty}</td>
-                    <td class="py-1.5 text-right font-mono">${t.price.toFixed(2)}</td>
-                    <td class="py-1.5 text-right font-mono ${t.net >= 0 ? 'text-emerald-400' : 'text-red-400'}">${t.net.toFixed(0)}</td>
-                    <td class="py-1.5 text-right font-mono ${t.pnl > 0 ? 'text-emerald-400' : t.pnl < 0 ? 'text-red-400' : 'text-slate-500'}">${t.pnl ? (t.pnl >= 0 ? '+' : '') + t.pnl.toFixed(0) : '—'}</td>
-                    <td class="py-1.5 text-slate-400 text-xs truncate" style="max-width:300px" title="${t.reason}">${t.reason}</td>
-                `;
-                tradelogBody.appendChild(tr);
-            });
+            return `<svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-height:340px" preserveAspectRatio="xMidYMid meet">
+                <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
+                ${yTicks.map(v => `<line x1="${padL}" x2="${W - padR}" y1="${yOf(v).toFixed(1)}" y2="${yOf(v).toFixed(1)}" stroke="#334155" stroke-width="0.5" stroke-dasharray="${v === 100 ? '4,3' : '2,4'}"/>
+                    <text x="${padL - 6}" y="${(yOf(v) + 4).toFixed(1)}" fill="#94a3b8" font-size="11" text-anchor="end" font-family="ui-sans-serif,system-ui">${v}</text>`).join('')}
+                <path d="${areaPathBot}" fill="#ef4444" fill-opacity="0.18"/>
+                <path d="${areaPathTop}" fill="#10b981" fill-opacity="0.22"/>
+                <path d="${linePath}" stroke="#1e3a8a" stroke-width="2" fill="none" stroke-linejoin="round"/>
+                <line x1="${xHi.toFixed(1)}" y1="${padT}" x2="${xHi.toFixed(1)}" y2="${H - padB}" stroke="#10b981" stroke-width="1.2" stroke-dasharray="3,3"/>
+                <line x1="${xLo.toFixed(1)}" y1="${padT}" x2="${xLo.toFixed(1)}" y2="${H - padB}" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="3,3"/>
+                <text x="${xHi.toFixed(1)}" y="${padT - 18}" fill="#10b981" font-size="11" font-weight="600" text-anchor="middle">Seasonal HIGH</text>
+                <text x="${xHi.toFixed(1)}" y="${padT - 6}" fill="#10b981" font-size="11" text-anchor="middle">~${doyToLabel(hiI)}</text>
+                <text x="${xLo.toFixed(1)}" y="${(H - padB + 18).toFixed(1)}" fill="#ef4444" font-size="11" font-weight="600" text-anchor="middle">Seasonal LOW</text>
+                <text x="${xLo.toFixed(1)}" y="${(H - padB + 30).toFixed(1)}" fill="#ef4444" font-size="11" text-anchor="middle">~${doyToLabel(loI)}</text>
+                ${monthStarts.map((doy, i) => `<text x="${xOf(doy).toFixed(1)}" y="${(H - padB + 14).toFixed(1)}" fill="#94a3b8" font-size="11" text-anchor="start" font-family="ui-sans-serif,system-ui">${monthNames[i]}</text>`).join('')}
+                <text transform="translate(14,${(padT + (H - padT - padB) / 2).toFixed(1)}) rotate(-90)" fill="#94a3b8" font-size="11" text-anchor="middle">% of annual average</text>
+            </svg>`;
         }
 
-        function renderEquityCurve(result, initialCapital) {
-            const el = document.getElementById('ai-equity-chart');
-            el.innerHTML = '';
-            const chart = LightweightCharts.createChart(el, {
-                layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#a8acb5', fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11 },
-                grid:   { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
-                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-                rightPriceScale: { borderColor: 'transparent' },
-                timeScale: { borderColor: 'transparent', timeVisible: false },
-                autoSize: true
-            });
-            // Synthetic "time" — use day index as Unix-seconds offset from a base date so LWC accepts it
-            const base = Math.floor(Date.now() / 1000) - result.equity.length * 86400;
-            const equityData = result.equity.map((e, i) => ({ time: base + i * 86400, value: e.value }));
-            const benchData  = result.benchValues.map((b, i) => ({ time: base + i * 86400, value: b.value }));
+        function renderBarsSVG(values, opts) {
+            const W = 1000, H = 260, padL = 50, padR = 20, padT = 20, padB = 30;
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const vals = values.map(v => v == null ? 0 : v);
+            const minV = Math.min(0, ...vals);
+            const maxV = Math.max(0, ...vals);
+            const range = maxV - minV || 1;
+            const yMin = minV - range * 0.15, yMax = maxV + range * 0.18;
+            const yOf = v => padT + (1 - (v - yMin) / (yMax - yMin)) * (H - padT - padB);
+            const y0 = yOf(0);
+            const slotW = (W - padL - padR) / 12;
+            const barW = slotW * 0.6;
 
-            const aiSeries = chart.addSeries(LightweightCharts.LineSeries, { color: '#00d084', lineWidth: 2, title: 'AI portfolio' });
-            aiSeries.setData(equityData);
-            const bhSeries = chart.addSeries(LightweightCharts.LineSeries, { color: '#94a3b8', lineWidth: 2, lineStyle: 2, title: 'Buy & hold' });
-            bhSeries.setData(benchData);
-            // Reference line at starting capital
-            try {
-                aiSeries.createPriceLine({ price: initialCapital, color: '#facc15', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'Start' });
-            } catch {}
-            chart.timeScale().fitContent();
+            // y-grid
+            const ticks = [];
+            const niceStep = (() => {
+                const s = (yMax - yMin) / 5;
+                const pow = Math.pow(10, Math.floor(Math.log10(s)));
+                const m = s / pow;
+                let step;
+                if (m < 1.5) step = pow; else if (m < 3) step = 2 * pow; else if (m < 7) step = 5 * pow; else step = 10 * pow;
+                return step;
+            })();
+            for (let v = Math.ceil(yMin / niceStep) * niceStep; v <= yMax; v += niceStep) ticks.push(+v.toFixed(2));
+
+            let maxAbsIdx = 0;
+            vals.forEach((v, i) => { if (Math.abs(v) > Math.abs(vals[maxAbsIdx])) maxAbsIdx = i; });
+
+            const bars = vals.map((v, i) => {
+                const cx = padL + slotW * (i + 0.5);
+                const x = cx - barW / 2;
+                const top = v >= 0 ? yOf(v) : y0;
+                const bot = v >= 0 ? y0 : yOf(v);
+                let fill;
+                if (opts.mode === 'signed') {
+                    fill = v >= 0 ? '#10b981' : '#ef4444';
+                } else {
+                    fill = i === maxAbsIdx && v > 0 ? '#10b981' : '#64748b';
+                }
+                const label = values[i] == null ? '—' : (v >= 0 ? '' : '') + v.toFixed(1);
+                const labelY = v >= 0 ? top - 4 : bot + 12;
+                return `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0.5, bot - top).toFixed(1)}" fill="${fill}" rx="2"/>
+                        <text x="${cx.toFixed(1)}" y="${labelY.toFixed(1)}" fill="#cbd5e1" font-size="11" text-anchor="middle" font-family="ui-sans-serif,system-ui">${label}</text>`;
+            }).join('');
+
+            return `<svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-height:280px" preserveAspectRatio="xMidYMid meet">
+                ${ticks.map(v => `<line x1="${padL}" x2="${W - padR}" y1="${yOf(v).toFixed(1)}" y2="${yOf(v).toFixed(1)}" stroke="#334155" stroke-width="0.5" stroke-dasharray="${v === 0 ? '0' : '2,4'}"/>
+                    <text x="${padL - 6}" y="${(yOf(v) + 4).toFixed(1)}" fill="#94a3b8" font-size="11" text-anchor="end" font-family="ui-sans-serif,system-ui">${v}</text>`).join('')}
+                ${bars}
+                ${months.map((m, i) => `<text x="${(padL + slotW * (i + 0.5)).toFixed(1)}" y="${(H - padB + 16).toFixed(1)}" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="ui-sans-serif,system-ui">${m}</text>`).join('')}
+                <text transform="translate(14,${(padT + (H - padT - padB) / 2).toFixed(1)}) rotate(-90)" fill="#94a3b8" font-size="11" text-anchor="middle">%</text>
+            </svg>`;
         }
+
+        function renderMonthlyBarsSVG(vals) { return renderBarsSVG(vals, { mode: 'signed' }); }
+        function renderForwardBarsSVG(vals) { return renderBarsSVG(vals, { mode: 'highlightMax' }); }
 
         // ───── Suggestions view (top buys + portfolio sell alerts) ──────
         let suggestionsInited = false;
@@ -5483,7 +4808,7 @@
         // ───── Top-nav wiring ────────────────────────────────────
         function showView(viewName) {
             currentView = viewName;
-            ['dashboard', 'index', 'stock', 'portfolio', 'screener', 'suggestions', 'ai_trading', 'signal_log'].forEach(v => {
+            ['dashboard', 'index', 'stock', 'portfolio', 'screener', 'suggestions'].forEach(v => {
                 const el = document.getElementById(`${v}-view`);
                 if (!el) return;
                 el.className = (v === viewName) ? 'view view-active' : 'view view-hidden';
@@ -5517,12 +4842,6 @@
                 } else if (target === 'suggestions') {
                     showView('suggestions');
                     initSuggestionsView();
-                } else if (target === 'ai_trading') {
-                    showView('ai_trading');
-                    initAITradingView();
-                } else if (target === 'signal_log') {
-                    showView('signal_log');
-                    initSignalLogView();
                 } else {
                     showView('dashboard');
                     currentIndex = null; currentStock = null;
