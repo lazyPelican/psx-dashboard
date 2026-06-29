@@ -1969,8 +1969,11 @@
             { key: 'ema12',  label: 'EMA 12',    color: '#00d084' },
             { key: 'ema26',  label: 'EMA 26',    color: '#ff5c5c' },
             { key: 'vwap',   label: 'VWAP',      color: '#facc15' },
-            { key: 'bb',     label: 'Bollinger', color: '#9ba3b4' }
+            { key: 'bb',     label: 'Bollinger', color: '#9ba3b4' },
+            { key: 'regime', label: 'Regime',    color: '#a78bfa' }
         ];
+        // Markov-regime ribbon colors (up / sideways / down)
+        const REGIME_COLORS = { up: '#00d084', sideways: '#94a3b8', down: '#ff5c5c' };
         const LWC_SUB_MODES = [
             { key: 'none',     label: 'Off' },
             { key: 'volume',   label: 'Volume' },
@@ -2136,6 +2139,63 @@
             });
         }
 
+        // ── Markov regime detection (3 states: up / sideways / down) ──
+        // A hidden Markov model over a normalised trend score, decoded with Viterbi.
+        // Sticky transitions make the regimes persistent rather than flickering bar-to-bar.
+        function calcRegime(bars) {
+            const n = bars.length;
+            if (n < 5) return [];
+
+            // 1) Daily log returns
+            const r = new Array(n).fill(0);
+            for (let i = 1; i < n; i++) r[i] = Math.log(bars[i].close / bars[i - 1].close) || 0;
+
+            // 2) Rolling trend score = mean return / volatility over a window
+            //    (>0 = upward drift, <0 = downward drift, ~0 = directionless/sideways)
+            const W = 10;
+            const score = new Array(n).fill(0);
+            for (let i = 0; i < n; i++) {
+                const a = Math.max(0, i - W + 1);
+                let sum = 0, cnt = 0;
+                for (let j = a; j <= i; j++) { sum += r[j]; cnt++; }
+                const m = sum / cnt;
+                let v = 0;
+                for (let j = a; j <= i; j++) v += (r[j] - m) * (r[j] - m);
+                v = Math.sqrt(v / cnt) || 1e-6;
+                score[i] = m / v;
+            }
+
+            // 3) HMM: 3 states with Gaussian emissions in score-space, Viterbi decode.
+            const states = [{ k: 'up', mean: 1.0 }, { k: 'sideways', mean: 0 }, { k: 'down', mean: -1.0 }];
+            const SIG = 0.5;                       // emission spread
+            const stay = 0.92, jump = (1 - stay) / 2;   // sticky → smooth regimes
+            const S = states.length;
+            const logT = states.map((_, i) => states.map((_, j) => Math.log(i === j ? stay : jump)));
+            const logEmit = (s, x) => { const d = x - states[s].mean; return -0.5 * d * d / (SIG * SIG); };
+
+            const dp = Array.from({ length: n }, () => new Array(S).fill(-Infinity));
+            const bp = Array.from({ length: n }, () => new Array(S).fill(0));
+            for (let s = 0; s < S; s++) dp[0][s] = Math.log(1 / S) + logEmit(s, score[0]);
+            for (let i = 1; i < n; i++) {
+                for (let s = 0; s < S; s++) {
+                    let best = -Infinity, arg = 0;
+                    for (let p = 0; p < S; p++) {
+                        const val = dp[i - 1][p] + logT[p][s];
+                        if (val > best) { best = val; arg = p; }
+                    }
+                    dp[i][s] = best + logEmit(s, score[i]);
+                    bp[i][s] = arg;
+                }
+            }
+            let last = 0, bestEnd = -Infinity;
+            for (let s = 0; s < S; s++) if (dp[n - 1][s] > bestEnd) { bestEnd = dp[n - 1][s]; last = s; }
+            const path = new Array(n);
+            path[n - 1] = last;
+            for (let i = n - 1; i > 0; i--) path[i - 1] = bp[i][path[i]];
+
+            return bars.map((b, i) => ({ time: b.time, state: states[path[i]].k }));
+        }
+
         // Slice/aggregate bars to current period + resolution
         function lwcCurrentBars() {
             if (!lwcState.allBars.length) return [];
@@ -2283,6 +2343,10 @@
             const cls = isUp ? 'text-emerald-400' : 'text-red-400';
             const fmt = (n) => (+n).toFixed(2);
             const volFmt = (n) => n >= 1e6 ? (n/1e6).toFixed(2) + 'M' : n >= 1e3 ? (n/1e3).toFixed(2) + 'K' : (n||0).toLocaleString();
+            const regState = lwcState._regimeByTime?.[bar.time];
+            const regHtml = regState
+                ? `<span>Regime <span class="font-mono font-semibold" style="color:${REGIME_COLORS[regState]}">${regState.toUpperCase()}</span></span>`
+                : '';
             legend.innerHTML = `
                 <span class="font-mono text-slate-200">${bar.time}</span>
                 <span>O <span class="font-mono text-slate-200">${fmt(bar.open)}</span></span>
@@ -2291,6 +2355,7 @@
                 <span>C <span class="font-mono ${cls}">${fmt(bar.close)}</span></span>
                 <span>Δ <span class="font-mono ${change >= 0 ? 'text-emerald-400' : 'text-red-400'}">${change >= 0 ? '+' : ''}${fmt(change)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)</span></span>
                 <span>Vol <span class="font-mono text-slate-300">${volFmt(bar.volume)}</span></span>
+                ${regHtml}
             `;
         }
 
@@ -2400,6 +2465,26 @@
                 addLine(bb.upper,  '#9ba3b4');
                 addLine(bb.middle, '#00d084');
                 addLine(bb.lower,  '#9ba3b4');
+            }
+
+            // Markov regime ribbon: a colored strip pinned to the bottom of the main
+            // pane (below the price line), one color per bar for up/sideways/down.
+            lwcState._regimeByTime = null;
+            if (a.regime) {
+                const reg = calcRegime(bars);
+                if (reg.length) {
+                    lwcState._regimeByTime = {};
+                    reg.forEach(x => { lwcState._regimeByTime[x.time] = x.state; });
+                    const rib = lwcState.mainChart.addSeries(LightweightCharts.HistogramSeries, {
+                        priceScaleId: 'regime',
+                        priceLineVisible: false,
+                        lastValueVisible: false,
+                        base: 0
+                    });
+                    rib.priceScale().applyOptions({ scaleMargins: { top: 0.9, bottom: 0 } });
+                    rib.setData(reg.map(x => ({ time: x.time, value: 1, color: REGIME_COLORS[x.state] })));
+                    lwcState.overlaySeries.push(rib);
+                }
             }
 
             // Markers (trades + dividends) + signal-level price lines
