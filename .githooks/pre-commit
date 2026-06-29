@@ -1,0 +1,13 @@
+#!/bin/sh
+# Stamp the current date/time (ddmmyyyy_hhmm) into the footer build badge in
+# app.html on every commit, then re-stage the file so the stamp is part of the
+# commit being created.
+#
+# Enable in a fresh clone with:  git config core.hooksPath .githooks
+
+STAMP=$(date +%d%m%Y_%H%M)
+
+# Replace the inner text of <span id="build-stamp">...</span>
+sed -i -E "s#(<span id=\"build-stamp\">)[^<]*(</span>)#\1${STAMP}\2#" app.html
+
+git add app.html
