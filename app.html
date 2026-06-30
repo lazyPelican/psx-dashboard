@@ -61,6 +61,10 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
                     Suggestions
                 </button>
+                <button data-nav="seasonpick" class="nav-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                    Season Pick
+                </button>
                 <button data-nav="portfolio" class="nav-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.93 23.93 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                     Portfolio
@@ -712,6 +716,67 @@
             </div>
         </div>
 
+        <!-- SEASON PICK VIEW -->
+        <div id="seasonpick-view" class="view view-hidden">
+            <div class="mb-6">
+                <h1 class="text-4xl font-bold text-white tracking-tight mb-1">Season Pick</h1>
+                <p class="text-slate-400 text-sm">Scan a universe and rank stocks by how strong a <span id="sp-month-label" class="text-emerald-400 font-semibold">this month</span> entry has been historically — with the best holding period (30 / 60 / 90 / 180 days) for entering this month.</p>
+            </div>
+
+            <!-- Universe + scan -->
+            <div class="glass-card rounded-xl p-4 mb-3 flex flex-wrap items-center gap-3">
+                <label class="text-xs text-slate-400 uppercase tracking-wider">Universe</label>
+                <select id="sp-universe" class="rounded px-3 py-2 border border-slate-700 text-sm flex-1 min-w-[200px]"></select>
+                <button id="sp-scan-btn" class="text-sm font-semibold px-4 py-2 rounded bg-emerald-500/90 text-slate-900 border border-emerald-500 hover:bg-emerald-400 transition">Scan seasonality</button>
+            </div>
+
+            <!-- Scan progress -->
+            <div id="sp-progress" class="hidden mb-4 rounded-lg border border-slate-700 bg-slate-900/40 p-3">
+                <div class="flex items-center justify-between text-xs mb-1.5">
+                    <span id="sp-progress-text" class="text-slate-300 font-semibold">Analyzing…</span>
+                    <span class="text-slate-500 hidden sm:inline">Fetches each stock's full history</span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-800 rounded overflow-hidden">
+                    <div id="sp-progress-fill" class="h-full bg-emerald-500 transition-all" style="width:0%"></div>
+                </div>
+            </div>
+
+            <!-- Sub-filters -->
+            <div id="sp-filters" class="hidden glass-card rounded-xl p-4 mb-3 flex flex-wrap items-center gap-3">
+                <label class="text-xs text-slate-400 uppercase tracking-wider">Sector</label>
+                <select id="sp-sector" class="rounded px-3 py-2 border border-slate-700 text-sm min-w-[180px]"></select>
+                <label class="flex items-center gap-2 text-sm text-slate-300 ml-1 cursor-pointer">
+                    <input type="checkbox" id="sp-pick-only" class="accent-emerald-500"> Only stocks whose <span class="text-emerald-400 font-semibold">best month is now</span>
+                </label>
+                <span id="sp-count" class="text-xs text-slate-400 ml-auto">--</span>
+            </div>
+
+            <!-- Results table -->
+            <div id="sp-results" class="hidden glass-card rounded-xl p-5">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="text-slate-400 uppercase text-xs border-b border-slate-700">
+                            <tr>
+                                <th class="py-2 pr-1" title="★ = this month is this stock's historically best entry month"></th>
+                                <th class="py-2">Symbol</th>
+                                <th class="py-2 hidden md:table-cell">Company</th>
+                                <th class="py-2 hidden lg:table-cell">Sector</th>
+                                <th class="py-2 text-right">Best hold</th>
+                                <th class="py-2 text-right">Avg return</th>
+                                <th class="py-2 text-right">Win rate</th>
+                                <th class="py-2 text-right hidden sm:table-cell">Median</th>
+                                <th class="py-2 text-right hidden sm:table-cell">Years</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sp-body" class="divide-y divide-slate-800"></tbody>
+                    </table>
+                </div>
+                <div id="sp-empty" class="hidden text-center text-slate-400 py-8">No stocks match — try a different universe or sector, or uncheck the filter.</div>
+            </div>
+
+            <div id="sp-hint" class="text-center text-slate-500 py-12 text-sm">Pick a universe and click <span class="text-slate-300 font-semibold">Scan seasonality</span> to begin. Scanning fetches full price history for every stock, so large universes can take a minute.</div>
+        </div>
+
         <div id="portfolio-view" class="view view-hidden">
             <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
                 <div>
@@ -937,7 +1002,7 @@
 
     <!-- Build version stamp (ddmmyyyy_hhmm) — auto-updated by the pre-commit hook -->
     <div class="fixed bottom-1 right-2 z-50 text-[10px] font-mono text-slate-600 pointer-events-none select-none">
-        v<span id="build-stamp">30062026_1227</span>
+        v<span id="build-stamp">30062026_1238</span>
     </div>
 
     <script>
@@ -3563,6 +3628,9 @@
                 screenerIndicatorCache[symbol] = null;
                 return null;
             }
+            // Keep the raw EOD around so the Season Pick seasonality scan (and the
+            // chart) can reuse it without re-fetching.
+            lastEodData[symbol] = data;
             const sorted = data.slice().reverse();
             const closes = sorted.map(d => d.close);
             const volumes = sorted.map(d => d.volume);
@@ -4573,6 +4641,190 @@
             return topTable + grid;
         }
 
+        // ───── Season Pick: scan a universe's seasonality for this month ─────
+        let spInited = false, spScanning = false, spResults = [];
+
+        // Pure per-stock analysis: for the target calendar month, find the best
+        // holding period (30/60/90/180d) by blended avg-return × win-rate, and also
+        // the stock's single best entry month overall (to flag "best month is now").
+        function computeSeasonalPick(raw, targetMonth) {
+            if (!raw || raw.length < 250) return null;
+            const rows = raw
+                .map(d => ({ d: new Date(d.timestamp * 1000), close: +d.close }))
+                .filter(r => r.close > 0 && !isNaN(r.d.getTime()))
+                .sort((a, b) => a.d - b.d);
+            if (rows.length < 250) return null;
+
+            const byYear = new Map();
+            rows.forEach(r => { const y = r.d.getFullYear(); let a = byYear.get(y); if (!a) { a = []; byYear.set(y, a); } a.push(r); });
+            const fullYears = [...byYear.entries()]
+                .filter(([y, a]) => a.length >= 200 && a[0].d.getMonth() <= 1 && a[a.length - 1].d.getMonth() >= 10)
+                .map(([y]) => y).sort();
+            if (fullYears.length < 3) return null;
+
+            const mfc = new Map(), mfd = new Map();
+            rows.forEach(r => { const k = r.d.getFullYear() + '-' + r.d.getMonth(); if (!mfc.has(k)) { mfc.set(k, r.close); mfd.set(k, r.d); } });
+            const coa = (t) => { let lo = 0, hi = rows.length - 1, ans = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (rows[m].d >= t) { ans = m; hi = m - 1; } else lo = m + 1; } return ans >= 0 ? rows[ans].close : null; };
+            const HOLDS = [30, 60, 90, 180];
+            const minObs = Math.max(3, Math.floor(fullYears.length * 0.6));
+
+            const bestHoldForMonth = (mo) => {
+                let best = null;
+                HOLDS.forEach(h => {
+                    const rets = [];
+                    fullYears.forEach(y => {
+                        const ed = mfd.get(y + '-' + mo), e = mfc.get(y + '-' + mo);
+                        if (ed == null || e == null || !(e > 0)) return;
+                        const x = coa(new Date(ed.getTime() + h * 86400000));
+                        if (x != null) rets.push((x - e) / e * 100);
+                    });
+                    const st = seasStats(rets);
+                    if (st.n >= minObs && st.avg != null) {
+                        const score = st.avg * (st.winRate / 100);
+                        if (!best || score > best.score) best = { hold: h, score, ...st };
+                    }
+                });
+                return best;
+            };
+
+            const current = bestHoldForMonth(targetMonth);
+            if (!current) return null;
+            let gbMonth = -1, gbScore = -Infinity;
+            for (let mo = 0; mo < 12; mo++) {
+                const b = bestHoldForMonth(mo);
+                if (b && b.score > gbScore) { gbScore = b.score; gbMonth = mo; }
+            }
+            return { years: fullYears.length, current, bestMonth: gbMonth, isPickNow: gbMonth === targetMonth };
+        }
+
+        // Fetch a stock's raw EOD, reusing the shared cache when present.
+        async function ensureEod(symbol) {
+            if (lastEodData[symbol] && lastEodData[symbol].length) return lastEodData[symbol];
+            const data = await fetchAPI('/timeseries/eod/' + symbol);
+            if (data && data.length) lastEodData[symbol] = data;
+            return data || null;
+        }
+
+        async function initSeasonPickView() {
+            if (!Object.keys(marketWatchData).length) await loadMarketWatch();
+            if (!indexList.length) {
+                const data = await fetchAPI('/indices');
+                if (data) {
+                    indicesData = data;
+                    indexList = data.map(idx => {
+                        const friendly = INDEX_FRIENDLY[idx.name] || { name: idx.name, fullName: idx.name };
+                        INDEX_API_MAP[idx.name] = idx.name;
+                        return { id: idx.name, name: friendly.name, fullName: friendly.fullName };
+                    });
+                }
+            }
+            if (spInited) return;
+            spInited = true;
+            const sel = document.getElementById('sp-universe');
+            sel.innerHTML = '<option value="__all">All Stocks</option>' +
+                indexList.map(i => `<option value="${i.id}">${i.name} — ${i.fullName}</option>`).join('');
+            document.getElementById('sp-month-label').textContent =
+                new Date().toLocaleString('en-US', { month: 'long' });
+            document.getElementById('sp-scan-btn').addEventListener('click', runSeasonPickScan);
+            document.getElementById('sp-sector').addEventListener('change', renderSeasonPickTable);
+            document.getElementById('sp-pick-only').addEventListener('change', renderSeasonPickTable);
+        }
+
+        async function runSeasonPickScan() {
+            if (spScanning) return;
+            spScanning = true;
+            const btn = document.getElementById('sp-scan-btn');
+            btn.disabled = true; btn.classList.add('opacity-60');
+            document.getElementById('sp-hint').classList.add('hidden');
+
+            const universe = document.getElementById('sp-universe').value;
+            const targetMonth = new Date().getMonth();
+            let candidates;
+            if (universe === '__all') candidates = Object.values(marketWatchData);
+            else { const d = await fetchAPI('/index/' + universe); candidates = d || []; }
+
+            const prog = document.getElementById('sp-progress');
+            const fill = document.getElementById('sp-progress-fill');
+            const txt = document.getElementById('sp-progress-text');
+            prog.classList.remove('hidden');
+            spResults = [];
+
+            const BATCH = 5, total = candidates.length;
+            let done = 0;
+            for (let i = 0; i < candidates.length; i += BATCH) {
+                const batch = candidates.slice(i, i + BATCH);
+                await Promise.all(batch.map(async c => {
+                    try {
+                        const raw = await ensureEod(c.symbol);
+                        const pick = raw ? computeSeasonalPick(raw, targetMonth) : null;
+                        if (pick) spResults.push({ symbol: c.symbol, name: c.name || '', sector: c.sectorName || '', mw: c, pick });
+                    } catch {}
+                }));
+                done += batch.length;
+                const pct = total ? Math.round(done / total * 100) : 100;
+                fill.style.width = pct + '%';
+                txt.textContent = `Analyzing seasonality… ${Math.min(done, total)} / ${total} (${spResults.length} with enough history)`;
+                await new Promise(r => setTimeout(r, 60));
+            }
+            txt.textContent = `Done — ${spResults.length} of ${total} stocks have ≥3 full years of history`;
+            setTimeout(() => prog.classList.add('hidden'), 1800);
+
+            buildSeasonPickSectors();
+            document.getElementById('sp-filters').classList.remove('hidden');
+            document.getElementById('sp-results').classList.remove('hidden');
+            renderSeasonPickTable();
+
+            btn.disabled = false; btn.classList.remove('opacity-60');
+            spScanning = false;
+        }
+
+        function buildSeasonPickSectors() {
+            const sel = document.getElementById('sp-sector');
+            const prev = sel.value;
+            const sectors = [...new Set(spResults.map(r => r.sector).filter(Boolean))].sort();
+            sel.innerHTML = '<option value="__all">All sectors</option>' +
+                sectors.map(s => `<option value="${s}">${s}</option>`).join('');
+            if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+        }
+
+        function renderSeasonPickTable() {
+            const sector = document.getElementById('sp-sector').value;
+            const pickOnly = document.getElementById('sp-pick-only').checked;
+            let rows = spResults.slice();
+            if (sector && sector !== '__all') rows = rows.filter(r => r.sector === sector);
+            if (pickOnly) rows = rows.filter(r => r.pick.isPickNow);
+            rows.sort((a, b) => b.pick.current.score - a.pick.current.score);
+
+            const body = document.getElementById('sp-body');
+            const empty = document.getElementById('sp-empty');
+            document.getElementById('sp-count').textContent =
+                `${rows.length} stock${rows.length === 1 ? '' : 's'}` + (pickOnly ? ' • best month is now' : '');
+
+            if (!rows.length) {
+                body.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+            body.innerHTML = rows.map(r => {
+                const c = r.pick.current;
+                const star = r.pick.isPickNow
+                    ? '<span title="This month is this stock\'s historically best entry month" class="text-amber-400">★</span>'
+                    : '';
+                return `<tr class="hover:bg-slate-800/30 cursor-pointer" onclick="openStock('${r.symbol}', resolveIndexFor(marketWatchData['${r.symbol}'] || {}))">
+                    <td class="py-2 pr-1 text-center">${star}</td>
+                    <td class="py-2 font-bold text-blue-400">${r.symbol}</td>
+                    <td class="py-2 text-slate-300 hidden md:table-cell">${r.name}</td>
+                    <td class="py-2 text-slate-400 hidden lg:table-cell">${r.sector}</td>
+                    <td class="py-2 text-right font-mono text-slate-300">${c.hold}d</td>
+                    <td class="py-2 text-right font-mono ${c.avg >= 0 ? 'text-emerald-400' : 'text-red-400'}">${c.avg >= 0 ? '+' : ''}${c.avg.toFixed(1)}%</td>
+                    <td class="py-2 text-right font-mono ${c.winRate >= 65 ? 'text-emerald-400' : c.winRate <= 35 ? 'text-red-400' : 'text-slate-300'}">${c.winRate.toFixed(0)}%</td>
+                    <td class="py-2 text-right font-mono text-slate-400 hidden sm:table-cell">${c.median >= 0 ? '+' : ''}${c.median.toFixed(1)}%</td>
+                    <td class="py-2 text-right font-mono text-slate-500 hidden sm:table-cell">${r.pick.years}</td>
+                </tr>`;
+            }).join('');
+        }
+
         // ───── Suggestions view (top buys + portfolio sell alerts) ──────
         let suggestionsInited = false;
 
@@ -5279,7 +5531,7 @@
         // ───── Top-nav wiring ────────────────────────────────────
         function showView(viewName) {
             currentView = viewName;
-            ['dashboard', 'index', 'stock', 'portfolio', 'screener', 'suggestions'].forEach(v => {
+            ['dashboard', 'index', 'stock', 'portfolio', 'screener', 'suggestions', 'seasonpick'].forEach(v => {
                 const el = document.getElementById(`${v}-view`);
                 if (!el) return;
                 el.className = (v === viewName) ? 'view view-active' : 'view view-hidden';
@@ -5313,6 +5565,9 @@
                 } else if (target === 'suggestions') {
                     showView('suggestions');
                     initSuggestionsView();
+                } else if (target === 'seasonpick') {
+                    showView('seasonpick');
+                    initSeasonPickView();
                 } else {
                     showView('dashboard');
                     currentIndex = null; currentStock = null;
