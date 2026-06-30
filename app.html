@@ -899,7 +899,7 @@
 
     <!-- Build version stamp (ddmmyyyy_hhmm) — auto-updated by the pre-commit hook -->
     <div class="fixed bottom-1 right-2 z-50 text-[10px] font-mono text-slate-600 pointer-events-none select-none">
-        v<span id="build-stamp">29062026_1809</span>
+        v<span id="build-stamp">30062026_1156</span>
     </div>
 
     <script>
@@ -2859,6 +2859,12 @@
             await loadMarketWatch();
             await renderDashboard();
 
+            // Start warming the screener/suggestions indicator cache immediately so the
+            // whole universe is fetched on page load instead of waiting for the user to
+            // open the Screener tab. Fire-and-forget: it batches with yields and updates
+            // its progress bar only if/when the Screener view is visible.
+            prewarmIndicators();
+
             // Refresh real data every 30 seconds
             setInterval(async () => {
                 await loadMarketWatch();
@@ -3579,7 +3585,11 @@
         // indicators. If the user has chained scanners, counts reflect what WOULD
         // remain if you added that scanner next to the chain (intersection preview).
         async function recomputeScannerCounts() {
-            const universe = document.getElementById('scr-universe').value;
+            // The universe <select> is empty until the Screener view is first opened.
+            // During the page-load prewarm it won't be populated yet, so fall back to
+            // "all stocks" rather than fetching the invalid /index/ endpoint.
+            const _uSel = document.getElementById('scr-universe');
+            const universe = (_uSel && _uSel.value) ? _uSel.value : '__all';
             let candidates;
             if (universe === '__all') {
                 candidates = Object.values(marketWatchData);
