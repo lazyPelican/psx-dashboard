@@ -476,7 +476,10 @@
                         <div id="seasonality-meta" class="text-xs text-slate-400">--</div>
                     </div>
                     <div id="seasonality-status" class="text-center text-slate-400 py-8 text-sm">Loading seasonal data…</div>
-                    <div id="seasonality-charts" class="hidden space-y-5">
+                    <div id="seasonality-charts" class="hidden space-y-6">
+                        <!-- Overall seasonality strength score + reliability sub-scores -->
+                        <div id="seas-strength"></div>
+
                         <div>
                             <div class="text-sm font-semibold text-white mb-1 text-center" id="seas-title-1">Seasonal Composite (detrended, each year = 100)</div>
                             <div id="seas-chart-composite" class="w-full"></div>
@@ -485,6 +488,25 @@
                             <div class="text-sm font-semibold text-white mb-1 text-center">Average return by calendar month (%)</div>
                             <div id="seas-chart-monthly" class="w-full"></div>
                         </div>
+
+                        <!-- Win rate / median / average / volatility / N / confidence per month -->
+                        <div>
+                            <div class="text-sm font-semibold text-white mb-2">Monthly statistics — win rate, median, average, volatility &amp; confidence</div>
+                            <div id="seas-monthly-table" class="overflow-x-auto"></div>
+                        </div>
+
+                        <!-- Year-by-year heatmap of monthly returns -->
+                        <div>
+                            <div class="text-sm font-semibold text-white mb-2">Monthly return heatmap — each cell = that month's return for that year (%)</div>
+                            <div id="seas-heatmap" class="overflow-x-auto"></div>
+                        </div>
+
+                        <!-- Best historical entry month + holding period across horizons -->
+                        <div>
+                            <div class="text-sm font-semibold text-white mb-2">Best historical entry &amp; holding period (30 / 60 / 90 / 180 days)</div>
+                            <div id="seas-entry-finder"></div>
+                        </div>
+
                         <div>
                             <div class="text-sm font-semibold text-white mb-1 text-center">Avg 6-month FORWARD return by entry month (%) — buy 1st of month, hold 6m</div>
                             <div id="seas-chart-forward" class="w-full"></div>
@@ -899,7 +921,7 @@
 
     <!-- Build version stamp (ddmmyyyy_hhmm) — auto-updated by the pre-commit hook -->
     <div class="fixed bottom-1 right-2 z-50 text-[10px] font-mono text-slate-600 pointer-events-none select-none">
-        v<span id="build-stamp">30062026_1156</span>
+        v<span id="build-stamp">30062026_1208</span>
     </div>
 
     <script>
@@ -2859,11 +2881,16 @@
             await loadMarketWatch();
             await renderDashboard();
 
-            // Start warming the screener/suggestions indicator cache immediately so the
-            // whole universe is fetched on page load instead of waiting for the user to
-            // open the Screener tab. Fire-and-forget: it batches with yields and updates
-            // its progress bar only if/when the Screener view is visible.
-            prewarmIndicators();
+            // Warm the screener/suggestions indicator cache on page load (instead of
+            // waiting for the user to open the Screener tab), but gently: defer to idle
+            // so the dashboard paints first, then prewarmIndicators() throttles itself
+            // with small batches + delays to avoid a heavy request burst on cold start.
+            const startPrewarm = () => prewarmIndicators();
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(startPrewarm, { timeout: 4000 });
+            } else {
+                setTimeout(startPrewarm, 2500);
+            }
 
             // Refresh real data every 30 seconds
             setInterval(async () => {
@@ -3950,6 +3977,33 @@
             return lastEodData[symbol];
         }
 
+        // Summary stats for an array of returns: count, average, median, win rate,
+        // std-dev (volatility) and a t-stat magnitude used for confidence rating.
+        function seasStats(arr) {
+            const n = arr.length;
+            if (!n) return { n: 0, avg: null, median: null, winRate: null, std: null, t: 0 };
+            const sorted = arr.slice().sort((a, b) => a - b);
+            const avg = arr.reduce((s, v) => s + v, 0) / n;
+            const median = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+            const wins = arr.filter(v => v > 0).length;
+            const winRate = wins / n * 100;
+            const variance = n > 1 ? arr.reduce((s, v) => s + (v - avg) * (v - avg), 0) / (n - 1) : 0;
+            const std = Math.sqrt(variance);
+            const t = std > 0 ? Math.abs(avg) / (std / Math.sqrt(n)) : 0;
+            return { n, avg, median, winRate, std, t };
+        }
+
+        // Confidence rating for one seasonal statistic, from sample size, directional
+        // win rate and t-stat magnitude.
+        function seasConfidence(st) {
+            if (!st || st.n < 3) return { label: 'Low', cls: 'text-red-400' };
+            const directional = st.winRate >= 65 || st.winRate <= 35;
+            const strongDir = st.winRate >= 72 || st.winRate <= 28;
+            if (st.n >= 7 && strongDir && st.t >= 1.5) return { label: 'High', cls: 'text-emerald-400' };
+            if (st.n >= 5 && directional && st.t >= 1.0) return { label: 'Medium', cls: 'text-amber-400' };
+            return { label: 'Low', cls: 'text-slate-400' };
+        }
+
         async function populateSeasonality(symbol) {
             const statusEl = document.getElementById('seasonality-status');
             const chartsEl = document.getElementById('seasonality-charts');
@@ -4076,6 +4130,78 @@
             });
             const fwdAvg = fwd.map(arr => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null);
 
+            // ── Per-calendar-month statistics (win rate, median, avg, volatility, N)
+            const monthlyStats = monthlyReturns.map(seasStats);
+
+            // ── Year × month matrix of monthly returns (for the heatmap)
+            const heat = {};
+            fullYears.forEach(y => {
+                heat[y] = new Array(12).fill(null);
+                for (let m = 0; m < 12; m++) {
+                    const cur = monthLastClose.get(y + '-' + m);
+                    const pm = m === 0 ? 11 : m - 1;
+                    const py = m === 0 ? y - 1 : y;
+                    const prev = monthLastClose.get(py + '-' + pm);
+                    if (cur != null && prev != null && prev > 0) heat[y][m] = (cur - prev) / prev * 100;
+                }
+            });
+
+            // ── Multi-horizon entry/exit finder. For each entry month and holding
+            //    period (in calendar days), enter at the first close of that month and
+            //    exit at the first close on/after entryDate + N days.
+            const HOLDS = [30, 60, 90, 180];
+            // Binary search for the first row whose date >= target (rows are ascending).
+            const closeOnOrAfter = (target) => {
+                let lo = 0, hi = rows.length - 1, ans = -1;
+                while (lo <= hi) { const mid = (lo + hi) >> 1; if (rows[mid].d >= target) { ans = mid; hi = mid - 1; } else lo = mid + 1; }
+                return ans >= 0 ? rows[ans].close : null;
+            };
+            const monthFirstDate = new Map();
+            rows.forEach(r => { const k = r.d.getFullYear() + '-' + r.d.getMonth(); if (!monthFirstDate.has(k)) monthFirstDate.set(k, r.d); });
+            const holdStats = {}; // hold -> [12] stats
+            HOLDS.forEach(h => {
+                holdStats[h] = [];
+                for (let m = 0; m < 12; m++) {
+                    const rets = [];
+                    fullYears.forEach(y => {
+                        const entryDate = monthFirstDate.get(y + '-' + m);
+                        const entry = monthFirstClose.get(y + '-' + m);
+                        if (entryDate == null || entry == null || !(entry > 0)) return;
+                        const exit = closeOnOrAfter(new Date(entryDate.getTime() + h * 86400000));
+                        if (exit != null) rets.push((exit - entry) / entry * 100);
+                    });
+                    holdStats[h][m] = seasStats(rets);
+                }
+            });
+            // Rank (hold, month) combos that have enough observations by a blended score
+            // that rewards both average return and win rate (long bias).
+            const minObs = Math.max(3, Math.floor(fullYears.length * 0.6));
+            const combos = [];
+            HOLDS.forEach(h => holdStats[h].forEach((st, m) => {
+                if (st.n >= minObs && st.avg != null) {
+                    combos.push({ hold: h, month: m, ...st, score: st.avg * (st.winRate / 100) });
+                }
+            }));
+            combos.sort((a, b) => b.score - a.score);
+            const bestEntries = combos.slice(0, 5);
+
+            // ── Seasonality strength score (0–100) from four sub-scores:
+            //    consistency (directional win rate), magnitude (seasonal amplitude),
+            //    sample size (years), and volatility (lower is better).
+            const clamp01 = x => Math.max(0, Math.min(1, x));
+            const validMonthly = monthlyStats.filter(s => s.n > 0);
+            const avgsArr = validMonthly.map(s => s.avg);
+            const amplitude = avgsArr.length ? (Math.max(...avgsArr) - Math.min(...avgsArr)) : 0;
+            const meanStd = validMonthly.length ? validMonthly.reduce((s, x) => s + x.std, 0) / validMonthly.length : 0;
+            const consistency = validMonthly.length ? validMonthly.reduce((s, x) => s + Math.abs(x.winRate - 50) / 50, 0) / validMonthly.length : 0;
+            const sub = {
+                consistency: clamp01(consistency * 1.4),     // avg |winRate-50|; ~0.71 dev → full
+                magnitude:   clamp01(amplitude / 10),        // 10pp spread across months → full
+                sample:      clamp01(fullYears.length / 10), // 10 full years → full
+                volatility:  clamp01(1 - meanStd / 12)       // 12pp avg monthly std → 0
+            };
+            const strength = Math.round(100 * (0.35 * sub.consistency + 0.30 * sub.magnitude + 0.20 * sub.sample + 0.15 * sub.volatility));
+
             // ── Render
             metaEl.textContent = `Years: ${fullYears[0]}–${fullYears[fullYears.length - 1]} (${fullYears.length} full years)`;
             document.getElementById('seas-title-1').textContent =
@@ -4090,6 +4216,10 @@
             document.getElementById('seas-chart-composite').innerHTML = renderCompositeSVG(smooth, hiI, loI, doyToLabel);
             document.getElementById('seas-chart-monthly').innerHTML = renderMonthlyBarsSVG(monthlyAvg);
             document.getElementById('seas-chart-forward').innerHTML = renderForwardBarsSVG(fwdAvg);
+            document.getElementById('seas-strength').innerHTML = renderSeasStrength(strength, sub, fullYears.length, meanStd);
+            document.getElementById('seas-monthly-table').innerHTML = renderMonthlyStatsTable(monthlyStats);
+            document.getElementById('seas-heatmap').innerHTML = renderSeasHeatmap(heat, fullYears);
+            document.getElementById('seas-entry-finder').innerHTML = renderEntryFinder(bestEntries, holdStats, HOLDS, minObs);
 
             statusEl.classList.add('hidden');
             chartsEl.classList.remove('hidden');
@@ -4204,6 +4334,137 @@
 
         function renderMonthlyBarsSVG(vals) { return renderBarsSVG(vals, { mode: 'signed' }); }
         function renderForwardBarsSVG(vals) { return renderBarsSVG(vals, { mode: 'highlightMax' }); }
+
+        // ── Seasonality: extra stat renderers ──────────────────────────────
+        const SEAS_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const fmtPct = (v, d = 1) => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(d) + '%';
+
+        // Green→red cell color for a return value (intensity scaled, capped at ±cap%).
+        function seasHeatColor(r, cap = 10) {
+            if (r == null) return 'rgba(255,255,255,0.03)';
+            const t = Math.max(-1, Math.min(1, r / cap));
+            const a = (0.12 + 0.65 * Math.abs(t)).toFixed(2);
+            return t >= 0 ? `rgba(16,185,129,${a})` : `rgba(239,68,68,${a})`;
+        }
+        const winColor = (w) => w == null ? 'text-slate-500'
+            : w >= 65 ? 'text-emerald-400' : w <= 35 ? 'text-red-400' : 'text-slate-300';
+        const retColor = (v) => v == null ? 'text-slate-500'
+            : v > 0 ? 'text-emerald-400' : v < 0 ? 'text-red-400' : 'text-slate-300';
+
+        // Overall strength score card + four reliability sub-scores.
+        function renderSeasStrength(score, sub, years, meanStd) {
+            const tier = score >= 70 ? { label: 'Strong', cls: 'text-emerald-400', bar: '#10b981' }
+                : score >= 45 ? { label: 'Moderate', cls: 'text-amber-400', bar: '#f59e0b' }
+                : { label: 'Weak', cls: 'text-slate-400', bar: '#64748b' };
+            const subBar = (label, v) => {
+                const pct = Math.round(v * 100);
+                return `<div>
+                    <div class="flex justify-between text-[11px] text-slate-400 mb-0.5"><span>${label}</span><span class="font-mono text-slate-300">${pct}</span></div>
+                    <div class="h-1.5 rounded bg-slate-700/60 overflow-hidden"><div class="h-full rounded" style="width:${pct}%;background:${tier.bar}"></div></div>
+                </div>`;
+            };
+            return `<div class="rounded-xl border border-slate-700 bg-slate-900/40 p-4 flex flex-col sm:flex-row gap-5 items-center">
+                <div class="text-center shrink-0">
+                    <div class="text-5xl font-bold ${tier.cls} leading-none">${score}</div>
+                    <div class="text-xs text-slate-400 mt-1">/ 100</div>
+                    <div class="text-sm font-semibold ${tier.cls} mt-1">${tier.label} seasonality</div>
+                </div>
+                <div class="flex-1 w-full grid grid-cols-2 gap-x-5 gap-y-2">
+                    ${subBar('Consistency', sub.consistency)}
+                    ${subBar('Magnitude', sub.magnitude)}
+                    ${subBar('Sample size', sub.sample)}
+                    ${subBar('Low volatility', sub.volatility)}
+                </div>
+                <div class="text-[11px] text-slate-400 shrink-0 sm:text-right space-y-0.5">
+                    <div>Years analyzed: <span class="text-slate-200 font-mono">${years}</span></div>
+                    <div>Avg monthly volatility: <span class="text-slate-200 font-mono">${meanStd.toFixed(1)}%</span></div>
+                </div>
+            </div>`;
+        }
+
+        // Per-month statistics table: win rate, median, average, volatility, N, confidence.
+        function renderMonthlyStatsTable(stats) {
+            const rows = stats.map((st, m) => {
+                const conf = seasConfidence(st);
+                return `<tr class="border-t border-slate-800">
+                    <td class="px-3 py-1.5 font-medium text-slate-200">${SEAS_MONTHS[m]}</td>
+                    <td class="px-3 py-1.5 text-right font-mono ${winColor(st.winRate)}">${st.winRate == null ? '—' : st.winRate.toFixed(0) + '%'}</td>
+                    <td class="px-3 py-1.5 text-right font-mono ${retColor(st.median)}">${fmtPct(st.median)}</td>
+                    <td class="px-3 py-1.5 text-right font-mono ${retColor(st.avg)}">${fmtPct(st.avg)}</td>
+                    <td class="px-3 py-1.5 text-right font-mono text-slate-300">${st.std == null ? '—' : st.std.toFixed(1) + '%'}</td>
+                    <td class="px-3 py-1.5 text-right font-mono text-slate-400">${st.n}</td>
+                    <td class="px-3 py-1.5 text-right font-semibold ${conf.cls}">${conf.label}</td>
+                </tr>`;
+            }).join('');
+            return `<table class="w-full text-xs">
+                <thead><tr class="text-slate-400 text-[11px] uppercase tracking-wider">
+                    <th class="px-3 py-1.5 text-left">Month</th>
+                    <th class="px-3 py-1.5 text-right">Win rate</th>
+                    <th class="px-3 py-1.5 text-right">Median</th>
+                    <th class="px-3 py-1.5 text-right">Average</th>
+                    <th class="px-3 py-1.5 text-right">Volatility</th>
+                    <th class="px-3 py-1.5 text-right">N</th>
+                    <th class="px-3 py-1.5 text-right">Confidence</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        }
+
+        // Year × month heatmap of monthly returns.
+        function renderSeasHeatmap(heat, years) {
+            const head = `<tr><th class="px-2 py-1 text-left text-[11px] text-slate-400 sticky left-0 bg-slate-900/80">Year</th>` +
+                SEAS_MONTHS.map(m => `<th class="px-1 py-1 text-[11px] text-slate-400 text-center">${m}</th>`).join('') + `</tr>`;
+            const body = years.map(y => {
+                const cells = heat[y].map(r => {
+                    const txt = r == null ? '' : (r >= 0 ? '+' : '') + r.toFixed(0);
+                    return `<td class="px-1 py-1 text-center font-mono text-[10px] text-slate-100" style="background:${seasHeatColor(r)}">${txt}</td>`;
+                }).join('');
+                return `<tr><td class="px-2 py-1 font-mono text-[11px] text-slate-300 sticky left-0 bg-slate-900/80">${y}</td>${cells}</tr>`;
+            }).join('');
+            return `<table class="w-full border-separate" style="border-spacing:2px"><thead>${head}</thead><tbody>${body}</tbody></table>
+                <div class="text-[10px] text-slate-500 mt-1">Green = positive month, red = negative; intensity scales with magnitude (capped at ±10%).</div>`;
+        }
+
+        // Best historical entry month + holding period, plus a full month × horizon
+        // grid of average returns.
+        function renderEntryFinder(best, holdStats, holds, minObs) {
+            if (!best.length) {
+                return `<div class="text-xs text-slate-500">Not enough overlapping history to rank entry/holding combinations (need ≥${minObs} observations per combo).</div>`;
+            }
+            const topRows = best.map((b, i) => `<tr class="border-t border-slate-800">
+                <td class="px-3 py-1.5 text-slate-400">${i + 1}</td>
+                <td class="px-3 py-1.5 font-medium text-slate-200">${SEAS_MONTHS[b.month]}</td>
+                <td class="px-3 py-1.5 text-right font-mono text-slate-300">${b.hold}d</td>
+                <td class="px-3 py-1.5 text-right font-mono ${retColor(b.avg)}">${fmtPct(b.avg)}</td>
+                <td class="px-3 py-1.5 text-right font-mono ${retColor(b.median)}">${fmtPct(b.median)}</td>
+                <td class="px-3 py-1.5 text-right font-mono ${winColor(b.winRate)}">${b.winRate.toFixed(0)}%</td>
+                <td class="px-3 py-1.5 text-right font-mono text-slate-400">${b.n}</td>
+            </tr>`).join('');
+            const topTable = `<table class="w-full text-xs mb-4">
+                <thead><tr class="text-slate-400 text-[11px] uppercase tracking-wider">
+                    <th class="px-3 py-1.5 text-left">#</th><th class="px-3 py-1.5 text-left">Enter (1st of)</th>
+                    <th class="px-3 py-1.5 text-right">Hold</th><th class="px-3 py-1.5 text-right">Avg</th>
+                    <th class="px-3 py-1.5 text-right">Median</th><th class="px-3 py-1.5 text-right">Win rate</th>
+                    <th class="px-3 py-1.5 text-right">N</th>
+                </tr></thead><tbody>${topRows}</tbody></table>`;
+
+            // Month × horizon average-return grid
+            const head = `<tr><th class="px-2 py-1 text-left text-[11px] text-slate-400">Hold ↓ / Enter →</th>` +
+                SEAS_MONTHS.map(m => `<th class="px-1 py-1 text-[11px] text-slate-400 text-center">${m}</th>`).join('') + `</tr>`;
+            const body = holds.map(h => {
+                const cells = holdStats[h].map(st => {
+                    const v = st.n >= minObs ? st.avg : null;
+                    const txt = v == null ? '' : (v >= 0 ? '+' : '') + v.toFixed(0);
+                    const title = st.n ? `avg ${fmtPct(st.avg)}, win ${st.winRate.toFixed(0)}%, N=${st.n}` : 'no data';
+                    return `<td class="px-1 py-1 text-center font-mono text-[10px] text-slate-100" style="background:${seasHeatColor(v, 12)}" title="${title}">${txt}</td>`;
+                }).join('');
+                return `<tr><td class="px-2 py-1 font-mono text-[11px] text-slate-300">${h}d</td>${cells}</tr>`;
+            }).join('');
+            const grid = `<div class="text-[11px] text-slate-400 mb-1">Average return by entry month &amp; holding period (%)</div>
+                <table class="w-full border-separate" style="border-spacing:2px"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+
+            return topTable + grid;
+        }
 
         // ───── Suggestions view (top buys + portfolio sell alerts) ──────
         let suggestionsInited = false;
@@ -4883,7 +5144,10 @@
             };
             setPrewarmProgress(symbols.length - todo.length);
 
-            const BATCH = 10;
+            // Small batches + a short pause between them keep the prewarm light on
+            // cold start (it runs in the background, so throughput isn't critical).
+            const BATCH = 5;
+            const BATCH_PAUSE = 150;
             let done = symbols.length - todo.length;
             // Initial counts (may all be 0 before any indicators are cached)
             await recomputeScannerCounts();
@@ -4894,7 +5158,7 @@
                 setPrewarmProgress(done);
                 // Refresh counts incrementally as the cache fills up
                 if (i % (BATCH * 5) === 0) await recomputeScannerCounts();
-                await new Promise(r => setTimeout(r, 0));
+                await new Promise(r => setTimeout(r, BATCH_PAUSE));
             }
             prewarmDone = true;
             prewarmInFlight = false;
