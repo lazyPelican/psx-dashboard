@@ -986,7 +986,7 @@
 
     <!-- Build version stamp (ddmmyyyy_hhmm) — auto-updated by the pre-commit hook -->
     <div class="fixed bottom-1 right-2 z-50 text-[10px] font-mono text-slate-600 pointer-events-none select-none">
-        v<span id="build-stamp">30062026_1254</span>
+        v<span id="build-stamp">30062026_1312</span>
     </div>
 
     <script>
@@ -3037,16 +3037,10 @@
             await loadMarketWatch();
             await renderDashboard();
 
-            // Warm the screener/suggestions indicator cache on page load (instead of
-            // waiting for the user to open the Screener tab), but gently: defer to idle
-            // so the dashboard paints first, then prewarmIndicators() throttles itself
-            // with small batches + delays to avoid a heavy request burst on cold start.
-            const startPrewarm = () => prewarmIndicators();
-            if ('requestIdleCallback' in window) {
-                requestIdleCallback(startPrewarm, { timeout: 4000 });
-            } else {
-                setTimeout(startPrewarm, 2500);
-            }
+            // Note: we intentionally do NOT prewarm the per-stock indicator cache on
+            // page load — that fires hundreds of (now deep-history) fetches and makes
+            // the page feel slow. The cache is built lazily instead, only when the user
+            // actually opens the Screener / Suggestions / Season Pick views.
 
             // Refresh real data every 30 seconds
             setInterval(async () => {
