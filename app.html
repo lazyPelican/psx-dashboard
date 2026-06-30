@@ -986,7 +986,7 @@
 
     <!-- Build version stamp (ddmmyyyy_hhmm) — auto-updated by the pre-commit hook -->
     <div class="fixed bottom-1 right-2 z-50 text-[10px] font-mono text-slate-600 pointer-events-none select-none">
-        v<span id="build-stamp">30062026_1312</span>
+        v<span id="build-stamp">30062026_1741</span>
     </div>
 
     <script>
@@ -4794,6 +4794,7 @@
                 <th class="py-2">Symbol</th>
                 <th class="py-2 hidden md:table-cell">Company</th>
                 <th class="py-2 hidden lg:table-cell">Sector</th>
+                <th class="py-2 text-right pr-2">Price</th>
                 ${SEAS_MONTHS.map((m, i) => `<th class="py-2 px-1 text-center ${i === tm ? 'text-emerald-400 font-bold' : ''}">${m}</th>`).join('')}
                 <th class="py-2 text-right pl-2 hidden sm:table-cell">Yrs</th>
             </tr></thead><tbody class="divide-y divide-slate-800">`;
@@ -4814,6 +4815,7 @@
                     <td class="py-1 font-bold text-blue-400">${r.symbol}</td>
                     <td class="py-1 text-slate-300 hidden md:table-cell">${r.name}</td>
                     <td class="py-1 text-slate-400 hidden lg:table-cell">${r.sector}</td>
+                    <td class="py-1 text-right pr-2 font-mono text-white">${(r.mw && r.mw.current != null ? r.mw.current : 0).toFixed(2)}</td>
                     ${cells}
                     <td class="py-1 text-right pl-2 font-mono text-slate-500 hidden sm:table-cell">${r.pick.years}</td>
                 </tr>`;
