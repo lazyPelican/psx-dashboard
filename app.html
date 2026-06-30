@@ -47,7 +47,7 @@
 <body class="p-4">
     <div class="max-w-7xl mx-auto">
         <!-- TOP NAV -->
-        <nav class="mb-6 flex items-center justify-between border-b border-slate-700 pb-3">
+        <nav class="mb-6 flex items-center justify-between gap-3 border-b border-slate-700 pb-3 flex-wrap">
             <div class="flex items-center gap-1">
                 <button data-nav="dashboard" class="nav-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
@@ -66,6 +66,22 @@
                     Portfolio
                 </button>
             </div>
+
+            <!-- Universal stock search — available from every view -->
+            <div id="global-search" class="relative flex-1 min-w-[160px] max-w-sm">
+                <svg class="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <input
+                    id="gsearch-input"
+                    type="text"
+                    placeholder="Search any stock…  ( / )"
+                    autocomplete="off"
+                    class="w-full bg-slate-800/60 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-800/80 transition"
+                />
+                <div id="gsearch-results" class="hidden absolute z-50 mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl max-h-80 overflow-y-auto"></div>
+            </div>
+
             <button id="settings-btn" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition" title="Settings (commission)">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
             </button>
@@ -921,7 +937,7 @@
 
     <!-- Build version stamp (ddmmyyyy_hhmm) — auto-updated by the pre-commit hook -->
     <div class="fixed bottom-1 right-2 z-50 text-[10px] font-mono text-slate-600 pointer-events-none select-none">
-        v<span id="build-stamp">30062026_1208</span>
+        v<span id="build-stamp">30062026_1227</span>
     </div>
 
     <script>
@@ -1429,6 +1445,97 @@
                 input.value = '';
                 input.focus();
                 applyIndexSearch();
+            });
+        })();
+
+        // ───── Universal header search: jump to any stock from any view ─────
+        function resolveIndexFor(s) {
+            return (s.listedIn || '').split(/\s+/).find(t => INDEX_FRIENDLY[t]) || 'KSE100';
+        }
+        function globalSearchMatches(query) {
+            const q = query.trim().toLowerCase();
+            if (!q) return [];
+            const out = [];
+            for (const sym in marketWatchData) {
+                const s = marketWatchData[sym];
+                const hay = (sym + ' ' + (s.name || '') + ' ' + (s.sectorName || '')).toLowerCase();
+                if (hay.includes(q)) out.push(s);
+            }
+            out.sort((a, b) => {
+                const ap = a.symbol.toLowerCase().startsWith(q) ? 0 : 1;
+                const bp = b.symbol.toLowerCase().startsWith(q) ? 0 : 1;
+                if (ap !== bp) return ap - bp;
+                return a.symbol.localeCompare(b.symbol);
+            });
+            return out.slice(0, 8);
+        }
+        (function setupGlobalSearch() {
+            const input = document.getElementById('gsearch-input');
+            const box = document.getElementById('gsearch-results');
+            if (!input || !box) return;
+            let results = [];
+            let active = -1;
+
+            const close = () => { box.classList.add('hidden'); box.innerHTML = ''; results = []; active = -1; };
+
+            const open = (sym) => {
+                const s = marketWatchData[sym];
+                if (!s) return;
+                close();
+                input.value = '';
+                input.blur();
+                openStock(s.symbol, resolveIndexFor(s));
+            };
+
+            const render = () => {
+                if (!results.length) {
+                    const q = input.value.trim();
+                    if (!q) { close(); return; }
+                    const loading = Object.keys(marketWatchData).length === 0;
+                    box.innerHTML = `<div class="px-3 py-2.5 text-sm text-slate-500">${loading ? 'Loading market data…' : 'No matching stocks'}</div>`;
+                    box.classList.remove('hidden');
+                    return;
+                }
+                box.innerHTML = results.map((s, i) => {
+                    const isPos = s.change >= 0;
+                    return `<div data-i="${i}" class="gs-row flex items-center justify-between gap-3 px-3 py-2 cursor-pointer ${i === active ? 'bg-slate-700/70' : 'hover:bg-slate-700/40'}">
+                        <div class="min-w-0">
+                            <div class="text-sm font-bold text-blue-400 truncate">${s.symbol}</div>
+                            <div class="text-[11px] text-slate-400 truncate">${s.name || s.sectorName || ''}</div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <div class="text-sm font-medium text-white">${(s.current ?? 0).toFixed(2)}</div>
+                            <div class="text-[11px] ${isPos ? 'text-emerald-400' : 'text-red-400'}">${isPos ? '+' : ''}${(s.changePercent ?? 0).toFixed(2)}%</div>
+                        </div>
+                    </div>`;
+                }).join('');
+                box.classList.remove('hidden');
+                box.querySelectorAll('.gs-row').forEach(row => {
+                    row.addEventListener('mousedown', e => { e.preventDefault(); open(results[+row.dataset.i].symbol); });
+                });
+            };
+
+            input.addEventListener('input', () => {
+                results = globalSearchMatches(input.value);
+                active = results.length ? 0 : -1;
+                render();
+            });
+            input.addEventListener('focus', () => { if (input.value.trim()) { results = globalSearchMatches(input.value); active = results.length ? 0 : -1; render(); } });
+            input.addEventListener('keydown', e => {
+                if (e.key === 'ArrowDown') { e.preventDefault(); if (results.length) { active = (active + 1) % results.length; render(); } }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); if (results.length) { active = (active - 1 + results.length) % results.length; render(); } }
+                else if (e.key === 'Enter') { if (active >= 0 && results[active]) open(results[active].symbol); }
+                else if (e.key === 'Escape') { close(); input.blur(); }
+            });
+            // Close on outside click
+            document.addEventListener('click', e => { if (!e.target.closest('#global-search')) close(); });
+            // "/" focuses the search from anywhere (unless already typing in a field)
+            document.addEventListener('keydown', e => {
+                if (e.key === '/' && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) && !document.activeElement?.isContentEditable) {
+                    e.preventDefault();
+                    input.focus();
+                    input.select();
+                }
             });
         })();
 
