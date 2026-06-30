@@ -72,6 +72,89 @@ async function psxFetch(urlPath) {
   return { type: 'html', data: await res.text() };
 }
 
+// --- Deep historical OHLCV (scstrade.com, mirrors the Python scraper) -------
+// scstrade returns full multi-year OHLCV for ordinary listed companies, which
+// PSX's /timeseries/eod often doesn't. We use it as the primary EOD source so
+// stocks always have enough history for seasonality etc., and fall back to PSX
+// EOD (works for ETFs and a few instruments scstrade lacks).
+const SCS_HISTORY_URL = 'https://scstrade.com/MarketStatistics/MS_HistoricalPrices.aspx/chart';
+
+function fmtMDY(d) {
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${m}/${day}/${d.getFullYear()}`;
+}
+
+async function fetchScstradeHistory(symbol, date1, date2) {
+  const payload = {
+    par: `${symbol} - ${symbol} Ltd.`,
+    date1, date2,
+    _search: false, nd: 1742133533395, rows: '20', page: 1,
+    sidx: 'trading_Date', sord: 'desc'
+  };
+  const res = await fetch(SCS_HISTORY_URL, {
+    method: 'POST',
+    headers: {
+      'authority': 'scstrade.com',
+      'accept': 'application/json, text/javascript, */*; q=0.01',
+      'content-type': 'application/json',
+      'x-requested-with': 'XMLHttpRequest',
+      'User-Agent': UA
+    },
+    body: JSON.stringify(payload),
+    timeout: 12000
+  });
+  if (!res.ok) throw new Error(`scstrade ${res.status}`);
+  const json = await res.json();
+  const rows = json.d || [];
+  return rows.map(r => {
+    const ms = parseInt(String(r.trading_Date).replace(/[^0-9]/g, ''), 10);
+    if (!ms) return null;
+    const close = +r.trading_close, open = +r.trading_open;
+    return {
+      timestamp: Math.floor(ms / 1000),
+      date: new Date(ms).toISOString().split('T')[0],
+      open, high: +r.trading_high, low: +r.trading_low, close,
+      volume: +r.trading_vol
+    };
+  }).filter(r => r && r.timestamp && !isNaN(r.close) && r.close > 0);
+}
+
+// PSX EOD as [{timestamp,date,close,volume,open,high,low}] (newest-first).
+async function fetchPsxEod(symbol) {
+  const result = await psxFetch(`/timeseries/eod/${symbol}`);
+  if (result.type !== 'json' || result.data.status !== 1) throw new Error('Invalid PSX EOD response');
+  return result.data.data.map(r => {
+    const close = r[1], open = r[3] ?? r[1];
+    return {
+      timestamp: r[0],
+      date: new Date(r[0] * 1000).toISOString().split('T')[0],
+      close, volume: r[2], open,
+      high: Math.max(open, close), low: Math.min(open, close)
+    };
+  });
+}
+
+// Best-available deep EOD: scstrade (full history) preferred, PSX EOD fallback.
+// Returns newest-first. Whichever source yields more rows wins, so we never
+// regress below what PSX alone would have provided.
+async function fetchEodDeep(symbol) {
+  const date2 = fmtMDY(new Date());
+  const date1 = '01/01/2000';
+  // Fetch both sources concurrently so a slow/blocked scstrade can't double the
+  // latency; whichever returns more rows wins (PSX still works for ETFs etc.).
+  const [scsR, psxR] = await Promise.allSettled([
+    fetchScstradeHistory(symbol, date1, date2),
+    fetchPsxEod(symbol)
+  ]);
+  const scs = scsR.status === 'fulfilled' ? scsR.value : [];
+  const psx = psxR.status === 'fulfilled' ? psxR.value : [];
+  let best = scs.length >= psx.length ? scs : psx;
+  if (!best.length) throw new Error('No EOD data from scstrade or PSX');
+  best.sort((a, b) => b.timestamp - a.timestamp); // newest-first
+  return best;
+}
+
 // --- HTML Parsers ---
 
 function parseMarketWatch(html) {
@@ -468,32 +551,30 @@ app.get('/api/timeseries/:type/:symbol', async (req, res) => {
   if (!['eod', 'int'].includes(type)) return res.status(400).json({ error: 'type must be eod or int' });
 
   const cacheKey = `ts-${type}-${symbol.toUpperCase()}`;
-  const ttl = type === 'eod' ? 3600000 : 60000;
+  // EOD history is immutable for past days, so cache it long (6h) to avoid
+  // hammering scstrade during a full-universe Season Pick / prewarm scan.
+  const ttl = type === 'eod' ? 21600000 : 60000;
 
   try {
     let data = getCached(cacheKey, ttl);
     if (!data) {
-      const result = await psxFetch(`/timeseries/${type}/${symbol.toUpperCase()}`);
-      if (result.type === 'json' && result.data.status === 1) {
-        const raw = result.data.data;
-        if (type === 'eod') {
-          data = raw.map(r => ({
-            timestamp: r[0],
-            date: new Date(r[0] * 1000).toISOString().split('T')[0],
-            close: r[1],
-            volume: r[2],
-            open: r[3]
-          }));
-        } else {
-          data = raw.map(r => ({
+      if (type === 'eod') {
+        // Deep history (scstrade primary, PSX EOD fallback) so seasonality etc.
+        // always have enough data.
+        data = await fetchEodDeep(symbol.toUpperCase());
+        setCache(cacheKey, data);
+      } else {
+        const result = await psxFetch(`/timeseries/${type}/${symbol.toUpperCase()}`);
+        if (result.type === 'json' && result.data.status === 1) {
+          data = result.data.data.map(r => ({
             timestamp: r[0],
             price: r[1],
             volume: r[2]
           }));
+          setCache(cacheKey, data);
+        } else {
+          throw new Error('Invalid response from PSX');
         }
-        setCache(cacheKey, data);
-      } else {
-        throw new Error('Invalid response from PSX');
       }
     }
     res.json({ status: 1, data });

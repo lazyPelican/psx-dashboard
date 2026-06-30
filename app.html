@@ -751,27 +751,11 @@
                 <span id="sp-count" class="text-xs text-slate-400 ml-auto">--</span>
             </div>
 
-            <!-- Results table -->
+            <!-- Results table (month-by-month matrix) -->
             <div id="sp-results" class="hidden glass-card rounded-xl p-5">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="text-slate-400 uppercase text-xs border-b border-slate-700">
-                            <tr>
-                                <th class="py-2 pr-1" title="★ = this month is this stock's historically best entry month"></th>
-                                <th class="py-2">Symbol</th>
-                                <th class="py-2 hidden md:table-cell">Company</th>
-                                <th class="py-2 hidden lg:table-cell">Sector</th>
-                                <th class="py-2 text-right">Best hold</th>
-                                <th class="py-2 text-right">Avg return</th>
-                                <th class="py-2 text-right">Win rate</th>
-                                <th class="py-2 text-right hidden sm:table-cell">Median</th>
-                                <th class="py-2 text-right hidden sm:table-cell">Years</th>
-                            </tr>
-                        </thead>
-                        <tbody id="sp-body" class="divide-y divide-slate-800"></tbody>
-                    </table>
-                </div>
+                <div id="sp-table-wrap" class="overflow-x-auto"></div>
                 <div id="sp-empty" class="hidden text-center text-slate-400 py-8">No stocks match — try a different universe or sector, or uncheck the filter.</div>
+                <div class="text-[11px] text-slate-500 mt-2">Each cell = best-hold average return for <span class="text-slate-300">entering on the 1st of that month</span> (hover for holding period &amp; win rate). The current month column is highlighted. <span class="text-amber-400">★</span> = the current month is that stock's historically strongest entry month.</div>
             </div>
 
             <div id="sp-hint" class="text-center text-slate-500 py-12 text-sm">Pick a universe and click <span class="text-slate-300 font-semibold">Scan seasonality</span> to begin. Scanning fetches full price history for every stock, so large universes can take a minute.</div>
@@ -1002,7 +986,7 @@
 
     <!-- Build version stamp (ddmmyyyy_hhmm) — auto-updated by the pre-commit hook -->
     <div class="fixed bottom-1 right-2 z-50 text-[10px] font-mono text-slate-600 pointer-events-none select-none">
-        v<span id="build-stamp">30062026_1238</span>
+        v<span id="build-stamp">30062026_1254</span>
     </div>
 
     <script>
@@ -4687,14 +4671,15 @@
                 return best;
             };
 
-            const current = bestHoldForMonth(targetMonth);
-            if (!current) return null;
+            const months = [];
             let gbMonth = -1, gbScore = -Infinity;
             for (let mo = 0; mo < 12; mo++) {
                 const b = bestHoldForMonth(mo);
+                months[mo] = b;
                 if (b && b.score > gbScore) { gbScore = b.score; gbMonth = mo; }
             }
-            return { years: fullYears.length, current, bestMonth: gbMonth, isPickNow: gbMonth === targetMonth };
+            if (!months.some(Boolean)) return null;
+            return { years: fullYears.length, months, current: months[targetMonth], bestMonth: gbMonth, isPickNow: gbMonth === targetMonth };
         }
 
         // Fetch a stock's raw EOD, reusing the shared cache when present.
@@ -4790,39 +4775,57 @@
         function renderSeasonPickTable() {
             const sector = document.getElementById('sp-sector').value;
             const pickOnly = document.getElementById('sp-pick-only').checked;
+            const tm = new Date().getMonth();
             let rows = spResults.slice();
             if (sector && sector !== '__all') rows = rows.filter(r => r.sector === sector);
             if (pickOnly) rows = rows.filter(r => r.pick.isPickNow);
-            rows.sort((a, b) => b.pick.current.score - a.pick.current.score);
+            // Sort by the current month's entry strength so this month's picks float up.
+            const scoreOf = r => (r.pick.months[tm] ? r.pick.months[tm].score : -Infinity);
+            rows.sort((a, b) => scoreOf(b) - scoreOf(a));
 
-            const body = document.getElementById('sp-body');
+            const wrap = document.getElementById('sp-table-wrap');
             const empty = document.getElementById('sp-empty');
             document.getElementById('sp-count').textContent =
                 `${rows.length} stock${rows.length === 1 ? '' : 's'}` + (pickOnly ? ' • best month is now' : '');
 
             if (!rows.length) {
-                body.innerHTML = '';
+                wrap.innerHTML = '';
                 empty.classList.remove('hidden');
                 return;
             }
             empty.classList.add('hidden');
-            body.innerHTML = rows.map(r => {
-                const c = r.pick.current;
+
+            const head = `<table class="w-full text-left text-sm"><thead class="text-slate-400 uppercase text-xs border-b border-slate-700"><tr>
+                <th class="py-2 pr-1"></th>
+                <th class="py-2">Symbol</th>
+                <th class="py-2 hidden md:table-cell">Company</th>
+                <th class="py-2 hidden lg:table-cell">Sector</th>
+                ${SEAS_MONTHS.map((m, i) => `<th class="py-2 px-1 text-center ${i === tm ? 'text-emerald-400 font-bold' : ''}">${m}</th>`).join('')}
+                <th class="py-2 text-right pl-2 hidden sm:table-cell">Yrs</th>
+            </tr></thead><tbody class="divide-y divide-slate-800">`;
+
+            const body = rows.map(r => {
                 const star = r.pick.isPickNow
-                    ? '<span title="This month is this stock\'s historically best entry month" class="text-amber-400">★</span>'
+                    ? '<span title="The current month is this stock\'s historically strongest entry month" class="text-amber-400">★</span>'
                     : '';
+                const cells = r.pick.months.map((st, i) => {
+                    const ring = i === tm ? 'box-shadow:inset 0 0 0 1px rgba(16,185,129,0.7);' : '';
+                    if (!st) return `<td class="py-1 px-1 text-center text-slate-700" style="${ring}">·</td>`;
+                    const v = st.avg;
+                    const title = `${SEAS_MONTHS[i]}: best hold ${st.hold}d · avg ${v >= 0 ? '+' : ''}${v.toFixed(1)}% · win ${st.winRate.toFixed(0)}% · ${st.n} yrs`;
+                    return `<td class="py-1 px-1 text-center font-mono text-[10px] text-slate-100" style="background:${seasHeatColor(v, 12)};${ring}" title="${title}">${v >= 0 ? '+' : ''}${v.toFixed(0)}</td>`;
+                }).join('');
                 return `<tr class="hover:bg-slate-800/30 cursor-pointer" onclick="openStock('${r.symbol}', resolveIndexFor(marketWatchData['${r.symbol}'] || {}))">
-                    <td class="py-2 pr-1 text-center">${star}</td>
-                    <td class="py-2 font-bold text-blue-400">${r.symbol}</td>
-                    <td class="py-2 text-slate-300 hidden md:table-cell">${r.name}</td>
-                    <td class="py-2 text-slate-400 hidden lg:table-cell">${r.sector}</td>
-                    <td class="py-2 text-right font-mono text-slate-300">${c.hold}d</td>
-                    <td class="py-2 text-right font-mono ${c.avg >= 0 ? 'text-emerald-400' : 'text-red-400'}">${c.avg >= 0 ? '+' : ''}${c.avg.toFixed(1)}%</td>
-                    <td class="py-2 text-right font-mono ${c.winRate >= 65 ? 'text-emerald-400' : c.winRate <= 35 ? 'text-red-400' : 'text-slate-300'}">${c.winRate.toFixed(0)}%</td>
-                    <td class="py-2 text-right font-mono text-slate-400 hidden sm:table-cell">${c.median >= 0 ? '+' : ''}${c.median.toFixed(1)}%</td>
-                    <td class="py-2 text-right font-mono text-slate-500 hidden sm:table-cell">${r.pick.years}</td>
+                    <td class="py-1 pr-1 text-center">${star}</td>
+                    <td class="py-1 font-bold text-blue-400">${r.symbol}</td>
+                    <td class="py-1 text-slate-300 hidden md:table-cell">${r.name}</td>
+                    <td class="py-1 text-slate-400 hidden lg:table-cell">${r.sector}</td>
+                    ${cells}
+                    <td class="py-1 text-right pl-2 font-mono text-slate-500 hidden sm:table-cell">${r.pick.years}</td>
                 </tr>`;
             }).join('');
+
+            wrap.innerHTML = head + body + '</tbody></table>';
         }
 
         // ───── Suggestions view (top buys + portfolio sell alerts) ──────
